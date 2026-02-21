@@ -1,0 +1,26 @@
+From: Claude Code
+Subject: Fix swank-compile-file* to respect load-p parameter
+
+The swank-compile-file* function was hardcoding NIL for the load-p
+parameter when calling swank-compile-file, causing compile-file-for-emacs
+to never actually load the compiled FASL even when load-p was T.
+
+This manifested as lisp_load_file reporting success (loadp=T in the
+COMPILATION-RESULT) but functions not being defined, because:
+1. The loadp return value echoed back the requested flag, not actual status
+2. The actual load never happened due to NIL being passed
+
+The fix passes the actual load-p parameter through to swank-compile-file.
+
+diff --git a/swank.lisp b/swank.lisp
+--- a/swank.lisp
++++ b/swank.lisp
+@@ -2413,7 +2413,7 @@
+   (multiple-value-bind (output-pathname warnings? failure?)
+       (swank-compile-file pathname
+                           (fasl-pathname pathname options)
+-                          nil
++                          load-p
+                           (or (guess-external-format pathname)
+                               :default)
+                           :policy policy)

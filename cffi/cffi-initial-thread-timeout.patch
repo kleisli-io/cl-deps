@@ -1,0 +1,27 @@
+--- a/src/cffi-sbcl.lisp
++++ b/src/cffi-sbcl.lisp
+@@ -336,6 +336,11 @@
+
+ ;;;# Loading and Closing Foreign Libraries
+
++;;; Timeout for call-within-initial-thread to prevent indefinite deadlocks
++#+darwin
++(defvar *initial-thread-timeout* 60
++  "Timeout in seconds for call-within-initial-thread. Prevents indefinite hangs.")
++
+ #+darwin
+ (defun call-within-initial-thread (fn &rest args)
+   (if (eq sb-thread:*current-thread*
+@@ -351,7 +356,11 @@
+              (multiple-value-setq (result error)
+                (ignore-errors (apply fn args))))
+            (sb-thread:signal-semaphore sem)))
+-        (sb-thread:wait-on-semaphore sem)
++        (unless (sb-thread:wait-on-semaphore sem :timeout *initial-thread-timeout*)
++          (error "CFFI: Timeout (~A seconds) waiting for initial thread to ~
++complete operation. This may indicate a threading deadlock. ~
++Consider using single-threaded Swank mode (:style nil)."
++                 *initial-thread-timeout*))
+         (if error
+             (signal error)
+             result))))
