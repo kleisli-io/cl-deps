@@ -210,7 +210,9 @@ SELF_EOF
       }
     '');
 
-  program = { name, main ? "${name}:main", srcs ? [], deps ? [], native ? [], tests ? null, passthru ? {} }:
+  program = { name, main ? "${name}:main", srcs ? [], deps ? [], native ? [], tests ? null, passthru ? {}
+            , dynamicSpaceSize ? null  # SBCL heap size in MB (null = compiled-in default ~1024)
+            }:
     let
       resolvedDeps = resolveDeps deps;
       lispNativeDeps = lib.unique (lib.flatten (native ++ (map (d: d.lispNativeDeps or []) resolvedDeps)));
@@ -238,7 +240,7 @@ SELF_EOF
       else null;
     in
     lib.fix (self: runCommand name
-      {
+      ({
         nativeBuildInputs = [ makeWrapper ];
         "${libPathVar}" = libPath;
         LANG = "C.UTF-8";
@@ -251,7 +253,11 @@ SELF_EOF
           lib = selfLib;
           self = self;
         };
-      } ''
+      } // lib.optionalAttrs (dynamicSpaceSize != null) {
+        # Bake SBCL runtime heap size into the wrapper at build time.
+        # The wrapProgram invocation below interpolates this variable.
+        NIX_BUILDLISP_LISP_ARGS = "--dynamic-space-size ${toString dynamicSpaceSize}";
+      }) ''
       ${if testDrv != null
         then ''
           if [ -f "${testDrv}" ]; then
@@ -273,7 +279,7 @@ SELF_EOF
 
       wrapProgram $out/bin/${name} \
         --prefix ${libPathVar} : "${libPath}" \
-        --add-flags "--"
+        --add-flags "''${NIX_BUILDLISP_LISP_ARGS:-} --"
     '');
 
   bundled = name:
