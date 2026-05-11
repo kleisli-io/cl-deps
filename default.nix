@@ -282,6 +282,12 @@ let
         srcs = [ "${src}/sha1.lisp" ];
       };
 
+    puri = let src = pkgs.srcOnly pkgs.sbcl.pkgs.puri; in
+      buildLisp.library {
+        name = "puri";
+        srcs = [ "${src}/src.lisp" ];
+      };
+
     # ===================================================================
     # Tier 1: one level of deps
     # ===================================================================
@@ -758,6 +764,52 @@ let
           ]);
       };
 
+    trivial-indent = let src = pkgs.srcOnly pkgs.sbcl.pkgs.trivial-indent; in
+      buildLisp.library {
+        name = "trivial-indent";
+        srcs = [ (src + "/indent.lisp") ];
+      };
+
+    documentation-utils = let src = pkgs.srcOnly pkgs.sbcl.pkgs.documentation-utils; in
+      buildLisp.library {
+        name = "documentation-utils";
+        deps = [ trivial-indent ];
+        srcs = [
+          (src + "/package.lisp")
+          (src + "/toolkit.lisp")
+          (src + "/documentation.lisp")
+        ];
+      };
+
+    float-features = let src = pkgs.fetchFromGitHub {
+      owner = "Shinmera"; repo = "float-features";
+      rev = "master";
+      sha256 = "15wsv3m7msvqqvvp2lkbxrz6xjf6ihc13q0xzdd8ylfy6jqk52xb";
+    }; in
+      buildLisp.library {
+        name = "float-features";
+        deps = [ trivial-features documentation-utils ];
+        srcs = map (f: src + ("/" + f)) [
+          "package.lisp"
+          "infinity.lisp"
+          "float-features.lisp"
+          "nan.lisp"
+          "documentation.lisp"
+        ];
+      };
+
+    jzon = let src = pkgs.srcOnly pkgs.sbcl.pkgs.jzon; in
+      buildLisp.library {
+        name = "jzon";
+        deps = [ closer-mop flexi-streams float-features trivial-gray-streams uiop ];
+        srcs = map (f: src + ("/src/" + f)) [
+          "eisel-lemire.lisp"
+          "ratio-to-double.lisp"
+          "schubfach.lisp"
+          "jzon.lisp"
+        ];
+      };
+
     # ===================================================================
     # Tier 3: three levels deep
     # ===================================================================
@@ -859,6 +911,22 @@ let
         srcs = [
           "${src}/package.lisp"
           "${src}/trivial-rfc-1123.lisp"
+        ];
+      };
+
+    cl-jschema = let src = pkgs.srcOnly pkgs.sbcl.pkgs.cl-jschema; in
+      buildLisp.library {
+        name = "cl-jschema";
+        deps = [ jzon alexandria cl-ppcre puri ];
+        srcs = map (f: src + ("/src/" + f)) [
+          "package.lisp"
+          "utils.lisp"
+          "types.lisp"
+          "keywords.lisp"
+          "json-schema.lisp"
+          "registry.lisp"
+          "parse.lisp"
+          "validate.lisp"
         ];
       };
 
@@ -1216,6 +1284,15 @@ let
         srcs = [ "${lackSrc}/src/middleware/accesslog.lisp" ];
       };
 
+    # Vendored — Lack upstream ships no cors middleware. Source kept
+    # alongside this default.nix.
+    lack-middleware-cors =
+      buildLisp.library {
+        name = "lack-middleware-cors";
+        deps = [];
+        srcs = [ ./lack-middleware-cors/cors.lisp ];
+      };
+
     lack = let lackSrc = pkgs.fetchFromGitHub {
       owner = "fukamachi"; repo = "lack";
       rev = "master";
@@ -1237,13 +1314,26 @@ let
         sha256 = "sha256-hKTmQzrBTAonzkUr/iwA54oAEPDwyoGpiQ/koSwLy6w=";
       };
       swankStub = pkgs.writeText "swank-stub.lisp" ''
-        ;; Only define stub if real Swank is not already loaded
+        ;; Only define stub if real Swank is not already loaded.
+        ;;
+        ;; *readtable-alist* must exist (and be bound) on the stub:
+        ;; named-readtables' in-readtable expansion checks
+        ;; (find-package :swank); if non-nil it then calls
+        ;; %frob-swank-readtable-alist, which does
+        ;;   (find-symbol "*READTABLE-ALIST*" <swank-pkg>)
+        ;;   → if missing, returns nil
+        ;;   (boundp nil)        → t  (nil is bound to itself)
+        ;;   (setf (symbol-value nil) ...) → "Nihil ex nihil" error.
+        ;; Defining the symbol with a sensible default makes downstream
+        ;; parenscript loads (and any other named-readtables consumer) safe
+        ;; under the stub.
         (unless (find-package :swank)
           (defpackage :swank
             (:use :cl)
-            (:export :create-server :stop-server))
+            (:export :create-server :stop-server :*readtable-alist*))
           (in-package :swank)
           (defvar *swank-available* nil)
+          (defvar *readtable-alist* nil)
           (defun create-server (&rest args)
             (declare (ignore args))
             (warn "SWANK not available - install full swank for REPL support")
