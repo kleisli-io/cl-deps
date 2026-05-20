@@ -29,19 +29,20 @@ let
       startSet = map (pkg: { key = identity pkg; inherit pkg; }) packages;
       operator = item:
         map (dep: { key = identity dep; pkg = dep; })
-          (item.pkg.lispDeps or []);
+          (item.pkg.lispDeps or [ ]);
     });
 
   # Topological sort using nixpkgs lib.toposort
   toposort = deps:
     let
       result = lib.toposort
-        (a: b: builtins.elem a (b.lispDeps or []))
+        (a: b: builtins.elem a (b.lispDeps or [ ]))
         deps;
-    in if result ? result then result.result
-       else if result ? cycle then
-         throw "Circular dependency detected: ${toString (map identity (result.cycle or []))}"
-       else deps;
+    in
+    if result ? result then result.result
+    else if result ? cycle then
+      throw "Circular dependency detected: ${toString (map identity (result.cycle or []))}"
+    else deps;
 
   # Resolve transitive deps: flatten, deduplicate, toposort
   resolveDeps = deps:
@@ -49,19 +50,21 @@ let
       flattened = flatten deps;
       # Deduplicate by lispName
       deduped = lib.unique flattened;
-    in toposort deduped;
+    in
+    toposort deduped;
 
   # --- Lisp code generation ---
 
   # Generate Lisp code to load all resolved deps
   genLoadLisp = deps:
     let
-      loadable = builtins.filter (d: (d.lispSrcs or []) != []) deps;
-    in lib.concatStringsSep "\n"
+      loadable = builtins.filter (d: (d.lispSrcs or [ ]) != [ ]) deps;
+    in
+    lib.concatStringsSep "\n"
       (map (dep: "(load \"${dep}/${dep.lispName}.${faslExt}\")") loadable);
 
   # Generate Lisp code to compile sources into a single FASL
-  genCompileLisp = { name, srcs, deps, muffle ? [] }: writeText "compile-${name}.lisp" ''
+  genCompileLisp = { name, srcs, deps, muffle ? [ ] }: writeText "compile-${name}.lisp" ''
     (require 'sb-posix)
 
     ${genLoadLisp deps}
@@ -144,19 +147,21 @@ let
 
   # --- Builders ---
 
-  library = { name, srcs ? [], deps ? [], native ? [], tests ? null, muffle ? [], passthru ? {} }:
+  library = { name, srcs ? [ ], deps ? [ ], native ? [ ], tests ? null, muffle ? [ ], passthru ? { } }:
     let
       resolvedDeps = resolveDeps deps;
-      lispNativeDeps = lib.unique (lib.flatten (native ++ (map (d: d.lispNativeDeps or []) resolvedDeps)));
+      lispNativeDeps = lib.unique (lib.flatten (native ++ (map (d: d.lispNativeDeps or [ ]) resolvedDeps)));
 
-      testDrv = if tests != null then
-        testSuite {
-          name = tests.name or "${name}-test";
-          srcs = srcs ++ (tests.srcs or []);
-          deps = deps ++ (tests.deps or []);
-          expression = tests.expression;
-        }
-      else null;
+      testDrv =
+        if tests != null then
+          testSuite
+            {
+              name = tests.name or "${name}-test";
+              srcs = srcs ++ (tests.srcs or [ ]);
+              deps = deps ++ (tests.deps or [ ]);
+              expression = tests.expression;
+            }
+        else null;
     in
     lib.fix (self: runCommand "${name}-cllib"
       {
@@ -173,71 +178,81 @@ let
           self = self;
         };
       } ''
-      ${if testDrv != null
-        then "echo 'Test ${testDrv} succeeded'"
-        else "echo 'No tests run'"}
+            ${if testDrv != null
+              then "echo 'Test ${testDrv} succeeded'"
+              else "echo 'No tests run'"}
 
-      mkdir $out
+            mkdir $out
 
-      ${lib.optionalString (lispNativeDeps != []) ''
-        echo -n "${lib.makeLibraryPath lispNativeDeps}" > $out/native-lib-path
-      ''}
+            ${lib.optionalString (lispNativeDeps != []) ''
+              echo -n "${lib.makeLibraryPath lispNativeDeps}" > $out/native-lib-path
+            ''}
 
-      # Generate reload.lisp for hot-reload
-      cat > $out/reload.lisp << 'DEPS_EOF'
-${genReloadLisp resolvedDeps}
-DEPS_EOF
-      ${lib.optionalString (srcs != []) ''
-      cat >> $out/reload.lisp << SELF_EOF
+            # Generate reload.lisp for hot-reload
+            cat > $out/reload.lisp << 'DEPS_EOF'
+      ${genReloadLisp resolvedDeps}
+      DEPS_EOF
+            ${lib.optionalString (srcs != []) ''
+            cat >> $out/reload.lisp << SELF_EOF
 
-;; Load compiled library FASL
-(load "$out/${name}.${faslExt}")
-SELF_EOF
-      ''}
+      ;; Load compiled library FASL
+      (load "$out/${name}.${faslExt}")
+      SELF_EOF
+            ''}
 
-      ${if srcs == []
-        then ''
-          echo "Meta-package ${name}: deps only"
-        ''
-        else ''
-          ${sbcl}/bin/sbcl --script ${
-            genCompileLisp {
-              inherit name srcs muffle;
-              deps = resolvedDeps;
+            ${if srcs == []
+              then ''
+                echo "Meta-package ${name}: deps only"
+              ''
+              else ''
+                ${sbcl}/bin/sbcl --script ${
+                  genCompileLisp {
+                    inherit name srcs muffle;
+                    deps = resolvedDeps;
+                  }
+                }
+              ''
             }
-          }
-        ''
-      }
     '');
 
-  program = { name, main ? "${name}:main", srcs ? [], deps ? [], native ? [], tests ? null, passthru ? {}
-            , dynamicSpaceSize ? null  # SBCL heap size in MB (null = compiled-in default ~1024)
-            }:
+  program =
+    { name
+    , main ? "${name}:main"
+    , srcs ? [ ]
+    , deps ? [ ]
+    , native ? [ ]
+    , tests ? null
+    , passthru ? { }
+    , dynamicSpaceSize ? null  # SBCL heap size in MB (null = compiled-in default ~1024)
+    }:
     let
       resolvedDeps = resolveDeps deps;
-      lispNativeDeps = lib.unique (lib.flatten (native ++ (map (d: d.lispNativeDeps or []) resolvedDeps)));
+      lispNativeDeps = lib.unique (lib.flatten (native ++ (map (d: d.lispNativeDeps or [ ]) resolvedDeps)));
       libPath = lib.makeLibraryPath lispNativeDeps;
 
-      hasSrcs = srcs != [];
+      hasSrcs = srcs != [ ];
 
-      selfLib = if hasSrcs then
-        library { inherit name srcs native; deps = resolvedDeps; }
-      else null;
+      selfLib =
+        if hasSrcs then
+          library { inherit name srcs native; deps = resolvedDeps; }
+        else null;
 
       # Deps MUST load before selfLib: kli.fasl references symbols by home
       # package (e.g. UIOP/IMAGE:QUIT) which requires deps to be loaded first.
       # Core's genLoadLispGeneric re-resolves via allDeps (toposort); we just
       # put selfLib last since resolvedDeps is already toposorted.
-      dumpDeps = resolvedDeps ++ (if hasSrcs then [ selfLib ] else []);
+      dumpDeps = resolvedDeps ++ (if hasSrcs then [ selfLib ] else [ ]);
 
-      testDrv = if tests != null then
-        testSuite {
-          name = tests.name or "${name}-test";
-          srcs = srcs ++ (tests.srcs or []);
-          deps = deps ++ (tests.deps or []);
-          expression = tests.expression;
-        }
-      else null;
+      testDrv =
+        if tests != null then
+          testSuite
+            {
+              name = tests.name or "${name}-test";
+              srcs = srcs ++ (tests.srcs or [ ]);
+              deps = deps ++ (tests.deps or [ ]);
+              expression = tests.expression;
+            }
+        else null;
     in
     lib.fix (self: runCommand name
       ({
@@ -288,10 +303,10 @@ SELF_EOF
       srcs = lib.singleton (builtins.toFile "${name}.lisp" "(require '${name})");
     };
 
-  testSuite = { name, expression, srcs, deps ? [], native ? [] }:
+  testSuite = { name, expression, srcs, deps ? [ ], native ? [ ] }:
     let
       resolvedDeps = resolveDeps deps;
-      lispNativeDeps = lib.unique (lib.flatten (native ++ (map (d: d.lispNativeDeps or []) resolvedDeps)));
+      lispNativeDeps = lib.unique (lib.flatten (native ++ (map (d: d.lispNativeDeps or [ ]) resolvedDeps)));
     in
     runCommand name
       {
@@ -311,15 +326,19 @@ SELF_EOF
   # Generate reload.lisp for development hot-reload
   genReloadLisp = deps:
     let
-      loadable = builtins.filter (dep: (dep.lispSrcs or []) != []) deps;
+      loadable = builtins.filter (dep: (dep.lispSrcs or [ ]) != [ ]) deps;
       getPkgName = dep: lib.toUpper (dep.lispPackage or dep.lispName);
-    in lib.concatStringsSep "\n"
-      (map (dep:
-        let pkgName = getPkgName dep;
-        in ''(unless (find-package :${pkgName})
+    in
+    lib.concatStringsSep "\n"
+      (map
+        (dep:
+          let pkgName = getPkgName dep;
+          in ''(unless (find-package :${pkgName})
     (load "${dep}/${dep.lispName}.${faslExt}"))''
-      ) loadable);
+        )
+        loadable);
 
-in {
+in
+{
   inherit library program bundled testSuite;
 }

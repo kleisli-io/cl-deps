@@ -109,11 +109,15 @@ let
         ];
       };
 
-    trivial-mimes = let src = pkgs.fetchFromGitHub {
-      owner = "Shinmera"; repo = "trivial-mimes";
-      rev = "master";
-      sha256 = "sha256-Ics5tsAIWXqtIyhoa68JpKCaq4AklEk9fI/RjuDMKnE=";
-    }; in
+    trivial-mimes =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "Shinmera";
+          repo = "trivial-mimes";
+          rev = "master";
+          sha256 = "sha256-Ics5tsAIWXqtIyhoa68JpKCaq4AklEk9fI/RjuDMKnE=";
+        };
+      in
       buildLisp.library {
         name = "trivial-mimes";
         srcs = [ "${src}/mime-types.lisp" ];
@@ -262,21 +266,29 @@ let
         ];
       };
 
-    event-emitter = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "event-emitter";
-      rev = "master";
-      sha256 = "sha256-1l+bI8xEfK5hDZbCyvyw454BXZpvb2GswVEvnkA+R04=";
-    }; in
+    event-emitter =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "event-emitter";
+          rev = "master";
+          sha256 = "sha256-1l+bI8xEfK5hDZbCyvyw454BXZpvb2GswVEvnkA+R04=";
+        };
+      in
       buildLisp.library {
         name = "event-emitter";
         srcs = [ "${src}/src/event-emitter.lisp" ];
       };
 
-    sha1 = let src = pkgs.fetchFromGitHub {
-      owner = "massung"; repo = "sha1";
-      rev = "master";
-      sha256 = "sha256-n3RMSHmzQ2UQSnPR/uzQvDb0Ycp8nNpE5hNz54sE1rE=";
-    }; in
+    sha1 =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "massung";
+          repo = "sha1";
+          rev = "master";
+          sha256 = "sha256-n3RMSHmzQ2UQSnPR/uzQvDb0Ycp8nNpE5hNz54sE1rE=";
+        };
+      in
       buildLisp.library {
         name = "sha1";
         srcs = [ "${src}/sha1.lisp" ];
@@ -292,10 +304,11 @@ let
     # Tier 1: one level of deps
     # ===================================================================
 
-    bordeaux-threads = let
-      src = pkgs.srcOnly pkgs.sbcl.pkgs.bordeaux-threads;
-      getSrc = f: "${src}/${f}";
-    in
+    bordeaux-threads =
+      let
+        src = pkgs.srcOnly pkgs.sbcl.pkgs.bordeaux-threads;
+        getSrc = f: "${src}/${f}";
+      in
       buildLisp.library {
         name = "bordeaux-threads";
         deps = [ alexandria global-vars trivial-features trivial-garbage ];
@@ -437,16 +450,19 @@ let
 
     # --- New from core ---
 
-    nibbles = let src = pkgs.srcOnly (pkgs.sbcl.pkgs.nibbles.overrideAttrs (oldAttrs: {
-      patches = oldAttrs.patches or [] ++ [
-        (pkgs.fetchpatch {
-          name = "nibbles-sbcl-x86-restore-weird-progn.patch";
-          url = "https://github.com/sharplispers/nibbles/commit/f37322b864ea12018bc0acbd70cb1e24bf0426eb.patch";
-          revert = true;
-          sha256 = "0h601g145qscmvykrzrf9bnlakfh5qawwmdd1z8f2cslfxrkj9jc";
-        })
-      ];
-    })); in
+    nibbles =
+      let
+        src = pkgs.srcOnly (pkgs.sbcl.pkgs.nibbles.overrideAttrs (oldAttrs: {
+          patches = oldAttrs.patches or [ ] ++ [
+            (pkgs.fetchpatch {
+              name = "nibbles-sbcl-x86-restore-weird-progn.patch";
+              url = "https://github.com/sharplispers/nibbles/commit/f37322b864ea12018bc0acbd70cb1e24bf0426eb.patch";
+              revert = true;
+              sha256 = "0h601g145qscmvykrzrf9bnlakfh5qawwmdd1z8f2cslfxrkj9jc";
+            })
+          ];
+        }));
+      in
       buildLisp.library {
         name = "nibbles";
         deps = [ asdf ];
@@ -468,14 +484,15 @@ let
     # Tier 2: two levels deep
     # ===================================================================
 
-    cffi = let
-      baseSrc = pkgs.srcOnly pkgs.sbcl.pkgs.cffi;
-      src = pkgs.applyPatches {
-        name = "cffi-source-patched";
-        src = baseSrc;
-        patches = [ ./cffi/cffi-initial-thread-timeout.patch ];
-      };
-    in
+    cffi =
+      let
+        baseSrc = pkgs.srcOnly pkgs.sbcl.pkgs.cffi;
+        src = pkgs.applyPatches {
+          name = "cffi-source-patched";
+          src = baseSrc;
+          patches = [ ./cffi/cffi-initial-thread-timeout.patch ];
+        };
+      in
       buildLisp.library {
         name = "cffi";
         deps = [ alexandria babel trivial-features asdf ];
@@ -497,22 +514,30 @@ let
         ];
       };
 
-    proc-parse = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "proc-parse";
-      rev = "master";
-      sha256 = "sha256-gpNY32YrKMp86FhWRZHSTeckmPJYV1UZ5Z5gt4yQax8=";
-    }; in
+    proc-parse =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "proc-parse";
+          rev = "master";
+          sha256 = "sha256-gpNY32YrKMp86FhWRZHSTeckmPJYV1UZ5Z5gt4yQax8=";
+        };
+      in
       buildLisp.library {
         name = "proc-parse";
         deps = [ alexandria babel sb-cltl2 ];
         srcs = [ "${src}/src/proc-parse.lisp" ];
       };
 
-    xsubseq = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "xsubseq";
-      rev = "master";
-      sha256 = "sha256-/aaUy8um0lZpJXuBMrLO3azbfjSOR4n1cJRVcQFO5/c=";
-    }; in
+    xsubseq =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "xsubseq";
+          rev = "master";
+          sha256 = "sha256-/aaUy8um0lZpJXuBMrLO3azbfjSOR4n1cJRVcQFO5/c=";
+        };
+      in
       buildLisp.library {
         name = "xsubseq";
         deps = [ sb-cltl2 ];
@@ -587,10 +612,11 @@ let
 
     # --- New from core ---
 
-    ironclad = let
-      src = pkgs.srcOnly pkgs.sbcl.pkgs.ironclad;
-      getSrc = f: "${src}/src/${f}";
-    in
+    ironclad =
+      let
+        src = pkgs.srcOnly pkgs.sbcl.pkgs.ironclad;
+        getSrc = f: "${src}/src/${f}";
+      in
       buildLisp.library {
         name = "ironclad";
         deps = [
@@ -739,15 +765,16 @@ let
         ];
       };
 
-    cl-json = let
-      src = pkgs.fetchFromGitHub {
-        owner = "sternenseemann";
-        repo = "cl-json";
-        rev = "c059bec94e28a11102a994d6949e2e52764f21fd";
-        sha256 = "0l07syw1b1x2zi8kj4iph3rf6vi6c16b7fk69iv7x27wrdsr1qwj";
-      };
-      getSrcs = subdir: map (f: src + ("/" + subdir + "/" + f));
-    in
+    cl-json =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "sternenseemann";
+          repo = "cl-json";
+          rev = "c059bec94e28a11102a994d6949e2e52764f21fd";
+          sha256 = "0l07syw1b1x2zi8kj4iph3rf6vi6c16b7fk69iv7x27wrdsr1qwj";
+        };
+        getSrcs = subdir: map (f: src + ("/" + subdir + "/" + f));
+      in
       buildLisp.library {
         name = "cl-json";
         deps = [ asdf ];
@@ -781,11 +808,15 @@ let
         ];
       };
 
-    float-features = let src = pkgs.fetchFromGitHub {
-      owner = "Shinmera"; repo = "float-features";
-      rev = "master";
-      sha256 = "15wsv3m7msvqqvvp2lkbxrz6xjf6ihc13q0xzdd8ylfy6jqk52xb";
-    }; in
+    float-features =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "Shinmera";
+          repo = "float-features";
+          rev = "master";
+          sha256 = "15wsv3m7msvqqvvp2lkbxrz6xjf6ihc13q0xzdd8ylfy6jqk52xb";
+        };
+      in
       buildLisp.library {
         name = "float-features";
         deps = [ trivial-features documentation-utils ];
@@ -814,11 +845,15 @@ let
     # Tier 3: three levels deep
     # ===================================================================
 
-    static-vectors = let src = pkgs.fetchFromGitHub {
-      owner = "sionescu"; repo = "static-vectors";
-      rev = "v1.8.9";
-      sha256 = "sha256-3BGtfPZH4qJKrZ6tJxf18QMbkn4qEofD198qSIFQOB0=";
-    }; in
+    static-vectors =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "sionescu";
+          repo = "static-vectors";
+          rev = "v1.8.9";
+          sha256 = "sha256-3BGtfPZH4qJKrZ6tJxf18QMbkn4qEofD198qSIFQOB0=";
+        };
+      in
       buildLisp.library {
         name = "static-vectors";
         deps = [ alexandria cffi ];
@@ -831,11 +866,15 @@ let
         ];
       };
 
-    smart-buffer = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "smart-buffer";
-      rev = "master";
-      sha256 = "sha256-+d58K2b6y8umupE3Yw9Hxw/DqEG6R/EeVqeGdFQwPuU=";
-    }; in
+    smart-buffer =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "smart-buffer";
+          rev = "master";
+          sha256 = "sha256-+d58K2b6y8umupE3Yw9Hxw/DqEG6R/EeVqeGdFQwPuU=";
+        };
+      in
       buildLisp.library {
         name = "smart-buffer";
         deps = [ xsubseq flexi-streams uiop ];
@@ -863,9 +902,16 @@ let
       buildLisp.library {
         name = "cl-plus-ssl";
         deps = [
-          alexandria bordeaux-threads cffi flexi-streams
-          trivial-features trivial-garbage trivial-gray-streams
-          usocket uiop sb-posix
+          alexandria
+          bordeaux-threads
+          cffi
+          flexi-streams
+          trivial-features
+          trivial-garbage
+          trivial-gray-streams
+          usocket
+          uiop
+          sb-posix
         ];
         native = [ pkgs.openssl ];
         srcs = map (f: src + ("/src/" + f)) [
@@ -889,22 +935,30 @@ let
 
     # --- New from core ---
 
-    circular-streams = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "circular-streams";
-      rev = "master";
-      sha256 = "sha256-OpeLjFbiiwycwZjMeYgu7YoyFYy7HieSY9hHxkoz/PI=";
-    }; in
+    circular-streams =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "circular-streams";
+          rev = "master";
+          sha256 = "sha256-OpeLjFbiiwycwZjMeYgu7YoyFYy7HieSY9hHxkoz/PI=";
+        };
+      in
       buildLisp.library {
         name = "circular-streams";
         deps = [ fast-io trivial-gray-streams ];
         srcs = [ "${src}/src/circular-streams.lisp" ];
       };
 
-    trivial-rfc-1123 = let src = pkgs.fetchFromGitHub {
-      owner = "stacksmith"; repo = "trivial-rfc-1123";
-      rev = "master";
-      sha256 = "sha256-3cCwIsm8Wd2jq/YKey8l01v0aKe/CaM8O9c6EOTlnvA=";
-    }; in
+    trivial-rfc-1123 =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "stacksmith";
+          repo = "trivial-rfc-1123";
+          rev = "master";
+          sha256 = "sha256-3cCwIsm8Wd2jq/YKey8l01v0aKe/CaM8O9c6EOTlnvA=";
+        };
+      in
       buildLisp.library {
         name = "trivial-rfc-1123";
         deps = [ cl-ppcre ];
@@ -934,11 +988,15 @@ let
     # Tier 4: four levels deep
     # ===================================================================
 
-    fast-io = let src = pkgs.fetchFromGitHub {
-      owner = "rpav"; repo = "fast-io";
-      rev = "master";
-      sha256 = "sha256-YBTROnJyB8w3H+GDhlHI+6n7XvnyoGN+8lDh9ZQXAHI=";
-    }; in
+    fast-io =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "rpav";
+          repo = "fast-io";
+          rev = "master";
+          sha256 = "sha256-YBTROnJyB8w3H+GDhlHI+6n7XvnyoGN+8lDh9ZQXAHI=";
+        };
+      in
       buildLisp.library {
         name = "fast-io";
         deps = [ alexandria trivial-gray-streams static-vectors ];
@@ -950,11 +1008,15 @@ let
         ];
       };
 
-    fast-http = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "fast-http";
-      rev = "master";
-      sha256 = "sha256-AD4fOVh5dlLJGYLlO16prkkpNhJF95zV9zDRQISAnRE=";
-    }; in
+    fast-http =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "fast-http";
+          rev = "master";
+          sha256 = "sha256-AD4fOVh5dlLJGYLlO16prkkpNhJF95zV9zDRQISAnRE=";
+        };
+      in
       buildLisp.library {
         name = "fast-http";
         deps = [ alexandria cl-utilities babel proc-parse xsubseq smart-buffer ];
@@ -1003,11 +1065,15 @@ let
         srcs = [ (src + "/quasiquote/quasiquote.lisp") ];
       };
 
-    cl-cookie = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "cl-cookie";
-      rev = "cea55aed8b9ad25fafd13defbcb9fe8f41b29546";
-      sha256 = "sha256-EFHefcWjFDw5k2BwUSVsBgFiJYEb9EYD2x8lWM4/DyQ=";
-    }; in
+    cl-cookie =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "cl-cookie";
+          rev = "cea55aed8b9ad25fafd13defbcb9fe8f41b29546";
+          sha256 = "sha256-EFHefcWjFDw5k2BwUSVsBgFiJYEb9EYD2x8lWM4/DyQ=";
+        };
+      in
       buildLisp.library {
         name = "cl-cookie";
         deps = [ proc-parse cl-ppcre quri local-time alexandria ];
@@ -1016,16 +1082,26 @@ let
 
     # --- New from core ---
 
-    http-body = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "http-body";
-      rev = "master";
-      sha256 = "sha256-5C8/tNp9W5De7Hs5cMoxN9o1ffuRnEzivdC/eE5UpFw=";
-    }; in
+    http-body =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "http-body";
+          rev = "master";
+          sha256 = "sha256-5C8/tNp9W5De7Hs5cMoxN9o1ffuRnEzivdC/eE5UpFw=";
+        };
+      in
       buildLisp.library {
         name = "http-body";
         deps = [
-          fast-http yason trivial-gray-streams
-          quri flexi-streams babel cl-ppcre cl-utilities
+          fast-http
+          yason
+          trivial-gray-streams
+          quri
+          flexi-streams
+          babel
+          cl-ppcre
+          cl-utilities
         ];
         srcs = [
           "${src}/src/util.lisp"
@@ -1036,11 +1112,15 @@ let
         ];
       };
 
-    fast-websocket = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "fast-websocket";
-      rev = "master";
-      sha256 = "sha256-Xw6vlbKdGu5XPGY9D13Ty0al3lWGTQT6pcakIxoqX4A=";
-    }; in
+    fast-websocket =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "fast-websocket";
+          rev = "master";
+          sha256 = "sha256-Xw6vlbKdGu5XPGY9D13Ty0al3lWGTQT6pcakIxoqX4A=";
+        };
+      in
       buildLisp.library {
         name = "fast-websocket";
         deps = [ fast-io babel alexandria ];
@@ -1080,25 +1160,36 @@ let
         ];
       };
 
-    hunchentoot = let
-      src = pkgs.srcOnly pkgs.sbcl.pkgs.hunchentoot;
-      url-rewrite = buildLisp.library {
-        name = "url-rewrite";
-        srcs = map (f: src + ("/url-rewrite/" + f)) [
-          "packages.lisp"
-          "specials.lisp"
-          "primitives.lisp"
-          "util.lisp"
-          "url-rewrite.lisp"
-        ];
-      };
-    in
+    hunchentoot =
+      let
+        src = pkgs.srcOnly pkgs.sbcl.pkgs.hunchentoot;
+        url-rewrite = buildLisp.library {
+          name = "url-rewrite";
+          srcs = map (f: src + ("/url-rewrite/" + f)) [
+            "packages.lisp"
+            "specials.lisp"
+            "primitives.lisp"
+            "util.lisp"
+            "url-rewrite.lisp"
+          ];
+        };
+      in
       buildLisp.library {
         name = "hunchentoot";
         deps = [
-          alexandria bordeaux-threads chunga cl-base64 cl-fad
-          rfc2388 cl-plus-ssl cl-ppcre flexi-streams md5
-          trivial-backtrace usocket url-rewrite
+          alexandria
+          bordeaux-threads
+          chunga
+          cl-base64
+          cl-fad
+          rfc2388
+          cl-plus-ssl
+          cl-ppcre
+          flexi-streams
+          md5
+          trivial-backtrace
+          usocket
+          url-rewrite
         ];
         srcs = map (f: src + ("/" + f)) [
           "packages.lisp"
@@ -1128,20 +1219,36 @@ let
         ];
       };
 
-    dexador = let
-      version = "0.9.15";
-      src = pkgs.fetchFromGitHub {
-        owner = "fukamachi"; repo = "dexador";
-        rev = "master";
-        sha256 = "sha256-ccl+AAlCC7wsAVLNgFRhDEC946M43om6W7tKU2hCJh0=";
-      };
-    in
+    dexador =
+      let
+        version = "0.9.15";
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "dexador";
+          rev = "master";
+          sha256 = "sha256-ccl+AAlCC7wsAVLNgFRhDEC946M43om6W7tKU2hCJh0=";
+        };
+      in
       buildLisp.library {
         name = "dexador";
         deps = [
-          fast-http quri fast-io babel trivial-gray-streams trivial-garbage
-          chunga cl-ppcre cl-cookie trivial-mimes chipz cl-base64
-          usocket cl-plus-ssl bordeaux-threads alexandria uiop
+          fast-http
+          quri
+          fast-io
+          babel
+          trivial-gray-streams
+          trivial-garbage
+          chunga
+          cl-ppcre
+          cl-cookie
+          trivial-mimes
+          chipz
+          cl-base64
+          usocket
+          cl-plus-ssl
+          bordeaux-threads
+          alexandria
+          uiop
         ];
         srcs = [
           "${src}/src/encoding.lisp"
@@ -1166,32 +1273,44 @@ let
     # Clack/Lack ecosystem (new from core)
     # ===================================================================
 
-    lack-component = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-component =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-component";
         srcs = [ "${lackSrc}/src/component.lisp" ];
       };
 
-    lack-util = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-util =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-util";
         deps = [ ironclad ];
         srcs = [ "${lackSrc}/src/util.lisp" ];
       };
 
-    lack-request = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-request =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-request";
         deps = [ quri cl-ppcre http-body circular-streams ];
@@ -1201,44 +1320,60 @@ let
         ];
       };
 
-    lack-response = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-response =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-response";
         deps = [ quri local-time ];
         srcs = [ "${lackSrc}/src/response.lisp" ];
       };
 
-    lack-app-file = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-app-file =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-app-file";
         deps = [ alexandria trivial-mimes trivial-rfc-1123 lack-component uiop ];
         srcs = [ "${lackSrc}/src/app/file.lisp" ];
       };
 
-    lack-middleware-backtrace = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-middleware-backtrace =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-middleware-backtrace";
         deps = [ uiop ];
         srcs = [ "${lackSrc}/src/middleware/backtrace.lisp" ];
       };
 
-    lack-middleware-session = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-middleware-session =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-middleware-session";
         deps = [ bordeaux-threads cl-ppcre lack-request lack-response lack-util ];
@@ -1251,33 +1386,45 @@ let
         ];
       };
 
-    lack-middleware-csrf = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-middleware-csrf =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-middleware-csrf";
         deps = [ lack-request lack-util ];
         srcs = [ "${lackSrc}/src/middleware/csrf.lisp" ];
       };
 
-    lack-middleware-static = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-middleware-static =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-middleware-static";
         deps = [ alexandria lack-app-file lack-component ];
         srcs = [ "${lackSrc}/src/middleware/static.lisp" ];
       };
 
-    lack-middleware-accesslog = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack-middleware-accesslog =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack-middleware-accesslog";
         deps = [ local-time lack-util ];
@@ -1289,15 +1436,19 @@ let
     lack-middleware-cors =
       buildLisp.library {
         name = "lack-middleware-cors";
-        deps = [];
+        deps = [ ];
         srcs = [ ./lack-middleware-cors/cors.lisp ];
       };
 
-    lack = let lackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "lack";
-      rev = "master";
-      sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
-    }; in
+    lack =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
       buildLisp.library {
         name = "lack";
         deps = [ lack-component lack-util ];
@@ -1307,47 +1458,54 @@ let
         ];
       };
 
-    clack = let
-      clackSrc = pkgs.fetchFromGitHub {
-        owner = "fukamachi"; repo = "clack";
-        rev = "master";
-        sha256 = "sha256-hKTmQzrBTAonzkUr/iwA54oAEPDwyoGpiQ/koSwLy6w=";
-      };
-      swankStub = pkgs.writeText "swank-stub.lisp" ''
-        ;; Only define stub if real Swank is not already loaded.
-        ;;
-        ;; *readtable-alist* must exist (and be bound) on the stub:
-        ;; named-readtables' in-readtable expansion checks
-        ;; (find-package :swank); if non-nil it then calls
-        ;; %frob-swank-readtable-alist, which does
-        ;;   (find-symbol "*READTABLE-ALIST*" <swank-pkg>)
-        ;;   → if missing, returns nil
-        ;;   (boundp nil)        → t  (nil is bound to itself)
-        ;;   (setf (symbol-value nil) ...) → "Nihil ex nihil" error.
-        ;; Defining the symbol with a sensible default makes downstream
-        ;; parenscript loads (and any other named-readtables consumer) safe
-        ;; under the stub.
-        (unless (find-package :swank)
-          (defpackage :swank
-            (:use :cl)
-            (:export :create-server :stop-server :*readtable-alist*))
-          (in-package :swank)
-          (defvar *swank-available* nil)
-          (defvar *readtable-alist* nil)
-          (defun create-server (&rest args)
-            (declare (ignore args))
-            (warn "SWANK not available - install full swank for REPL support")
-            nil)
-          (defun stop-server (&rest args)
-            (declare (ignore args))
-            nil))
-      '';
-    in
+    clack =
+      let
+        clackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "clack";
+          rev = "master";
+          sha256 = "sha256-hKTmQzrBTAonzkUr/iwA54oAEPDwyoGpiQ/koSwLy6w=";
+        };
+        swankStub = pkgs.writeText "swank-stub.lisp" ''
+          ;; Only define stub if real Swank is not already loaded.
+          ;;
+          ;; *readtable-alist* must exist (and be bound) on the stub:
+          ;; named-readtables' in-readtable expansion checks
+          ;; (find-package :swank); if non-nil it then calls
+          ;; %frob-swank-readtable-alist, which does
+          ;;   (find-symbol "*READTABLE-ALIST*" <swank-pkg>)
+          ;;   → if missing, returns nil
+          ;;   (boundp nil)        → t  (nil is bound to itself)
+          ;;   (setf (symbol-value nil) ...) → "Nihil ex nihil" error.
+          ;; Defining the symbol with a sensible default makes downstream
+          ;; parenscript loads (and any other named-readtables consumer) safe
+          ;; under the stub.
+          (unless (find-package :swank)
+            (defpackage :swank
+              (:use :cl)
+              (:export :create-server :stop-server :*readtable-alist*))
+            (in-package :swank)
+            (defvar *swank-available* nil)
+            (defvar *readtable-alist* nil)
+            (defun create-server (&rest args)
+              (declare (ignore args))
+              (warn "SWANK not available - install full swank for REPL support")
+              nil)
+            (defun stop-server (&rest args)
+              (declare (ignore args))
+              nil))
+        '';
+      in
       buildLisp.library {
         name = "clack";
         deps = [
-          alexandria bordeaux-threads usocket
-          lack lack-middleware-backtrace lack-util uiop
+          alexandria
+          bordeaux-threads
+          usocket
+          lack
+          lack-middleware-backtrace
+          lack-util
+          uiop
         ];
         srcs = [
           swankStub
@@ -1358,17 +1516,25 @@ let
         ];
       };
 
-    clack-handler-hunchentoot = let clackSrc = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "clack";
-      rev = "master";
-      sha256 = "sha256-hKTmQzrBTAonzkUr/iwA54oAEPDwyoGpiQ/koSwLy6w=";
-    }; in
+    clack-handler-hunchentoot =
+      let
+        clackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "clack";
+          rev = "master";
+          sha256 = "sha256-hKTmQzrBTAonzkUr/iwA54oAEPDwyoGpiQ/koSwLy6w=";
+        };
+      in
       buildLisp.library {
         name = "clack-handler-hunchentoot";
         deps = [
-          hunchentoot alexandria bordeaux-threads
-          flexi-streams split-sequence
-          clack lack-request
+          hunchentoot
+          alexandria
+          bordeaux-threads
+          flexi-streams
+          split-sequence
+          clack
+          lack-request
         ];
         srcs = [
           "${clackSrc}/src/handler/hunchentoot.lisp"
@@ -1379,16 +1545,25 @@ let
     # WebSocket Driver (new from core)
     # ===================================================================
 
-    websocket-driver-base = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "websocket-driver";
-      rev = "master";
-      sha256 = "sha256-5qJEkjeaxsAqfkn3mcqNkOOczbxIumQmi4Zveqx0gZY=";
-    }; in
+    websocket-driver-base =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "websocket-driver";
+          rev = "master";
+          sha256 = "sha256-5qJEkjeaxsAqfkn3mcqNkOOczbxIumQmi4Zveqx0gZY=";
+        };
+      in
       buildLisp.library {
         name = "websocket-driver-base";
         deps = [
-          fast-websocket fast-io event-emitter sha1
-          cl-base64 split-sequence bordeaux-threads
+          fast-websocket
+          fast-io
+          event-emitter
+          sha1
+          cl-base64
+          split-sequence
+          bordeaux-threads
         ];
         srcs = [
           "${src}/src/util.lisp"
@@ -1397,16 +1572,23 @@ let
         ];
       };
 
-    websocket-driver-server = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "websocket-driver";
-      rev = "master";
-      sha256 = "sha256-5qJEkjeaxsAqfkn3mcqNkOOczbxIumQmi4Zveqx0gZY=";
-    }; in
+    websocket-driver-server =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "websocket-driver";
+          rev = "master";
+          sha256 = "sha256-5qJEkjeaxsAqfkn3mcqNkOOczbxIumQmi4Zveqx0gZY=";
+        };
+      in
       buildLisp.library {
         name = "websocket-driver-server";
         deps = [
-          fast-websocket fast-io babel
-          websocket-driver-base clack
+          fast-websocket
+          fast-io
+          babel
+          websocket-driver-base
+          clack
         ];
         srcs = [
           "${src}/src/ws/server.lisp"
@@ -1414,16 +1596,26 @@ let
         ];
       };
 
-    websocket-driver-client = let src = pkgs.fetchFromGitHub {
-      owner = "fukamachi"; repo = "websocket-driver";
-      rev = "master";
-      sha256 = "sha256-5qJEkjeaxsAqfkn3mcqNkOOczbxIumQmi4Zveqx0gZY=";
-    }; in
+    websocket-driver-client =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "websocket-driver";
+          rev = "master";
+          sha256 = "sha256-5qJEkjeaxsAqfkn3mcqNkOOczbxIumQmi4Zveqx0gZY=";
+        };
+      in
       buildLisp.library {
         name = "websocket-driver-client";
         deps = [
-          usocket cl-plus-ssl fast-io fast-websocket
-          fast-http cl-base64 babel quri
+          usocket
+          cl-plus-ssl
+          fast-io
+          fast-websocket
+          fast-http
+          cl-base64
+          babel
+          quri
           websocket-driver-base
         ];
         srcs = [
@@ -1436,73 +1628,74 @@ let
     # Swank — SLIME's Common Lisp server
     # ===================================================================
 
-    swank = let
-      slimeSrc = pkgs.fetchFromGitHub {
-        owner = "slime";
-        repo = "slime";
-        rev = "v2.30";
-        sha256 = "0qb7m65gq0mbxfrdppkh3k4jn13i14i07ziga4r8b3rmrxhrmlv0";
-      };
-      patchedSlimeSrc = pkgs.applyPatches {
-        name = "slime-source-patched";
-        src = slimeSrc;
-        patches = [ ./swank-compile-file-fix.patch ];
-      };
-      src = f: "${patchedSlimeSrc}/${f}";
-      packageLoader = pkgs.writeText "swank-package-loader.lisp" ''
-        ;;; Package definitions for Swank (replaces swank-loader:define-package)
-        (eval-when (:compile-toplevel :load-toplevel :execute)
-          (unless (find-package :swank)
-            (make-package :swank :use '(:cl)))
-          (flet ((forward-declare-var (name)
-                   (let ((sym (intern name :swank)))
-                     (unless (boundp sym)
-                       (proclaim `(special ,sym))
-                       (setf (symbol-value sym) nil))
-                     (export sym :swank)))
-                 (forward-declare-fn (name)
-                   (let ((sym (intern name :swank)))
-                     (unless (fboundp sym)
-                       (setf (fdefinition sym)
-                             (lambda (&rest args)
-                               (declare (ignore args))
-                               (error "~A not yet defined" sym))))
-                     (export sym :swank))))
-            (forward-declare-var "*COMMUNICATION-STYLE*")
-            (forward-declare-var "*SWANK-DEBUGGER-CONDITION*")
-            (forward-declare-fn "SWANK-DEBUGGER-HOOK")
-            (forward-declare-fn "Y-OR-N-P-IN-EMACS")))
+    swank =
+      let
+        slimeSrc = pkgs.fetchFromGitHub {
+          owner = "slime";
+          repo = "slime";
+          rev = "v2.30";
+          sha256 = "0qb7m65gq0mbxfrdppkh3k4jn13i14i07ziga4r8b3rmrxhrmlv0";
+        };
+        patchedSlimeSrc = pkgs.applyPatches {
+          name = "slime-source-patched";
+          src = slimeSrc;
+          patches = [ ./swank-compile-file-fix.patch ];
+        };
+        src = f: "${patchedSlimeSrc}/${f}";
+        packageLoader = pkgs.writeText "swank-package-loader.lisp" ''
+          ;;; Package definitions for Swank (replaces swank-loader:define-package)
+          (eval-when (:compile-toplevel :load-toplevel :execute)
+            (unless (find-package :swank)
+              (make-package :swank :use '(:cl)))
+            (flet ((forward-declare-var (name)
+                     (let ((sym (intern name :swank)))
+                       (unless (boundp sym)
+                         (proclaim `(special ,sym))
+                         (setf (symbol-value sym) nil))
+                       (export sym :swank)))
+                   (forward-declare-fn (name)
+                     (let ((sym (intern name :swank)))
+                       (unless (fboundp sym)
+                         (setf (fdefinition sym)
+                               (lambda (&rest args)
+                                 (declare (ignore args))
+                                 (error "~A not yet defined" sym))))
+                       (export sym :swank))))
+              (forward-declare-var "*COMMUNICATION-STYLE*")
+              (forward-declare-var "*SWANK-DEBUGGER-CONDITION*")
+              (forward-declare-fn "SWANK-DEBUGGER-HOOK")
+              (forward-declare-fn "Y-OR-N-P-IN-EMACS")))
 
-        (defpackage :swank-loader
-          (:use :cl)
-          (:export :define-package
-                   :init
-                   :*source-directory*
-                   :*fasl-directory*))
+          (defpackage :swank-loader
+            (:use :cl)
+            (:export :define-package
+                     :init
+                     :*source-directory*
+                     :*fasl-directory*))
 
-        (in-package :swank-loader)
+          (in-package :swank-loader)
 
-        (defvar *source-directory* nil)
-        (defvar *fasl-directory* nil)
+          (defvar *source-directory* nil)
+          (defvar *fasl-directory* nil)
 
-        (defmacro define-package (name &rest options)
-          "Define a package like DEFPACKAGE but with a few extensions.
-        Supports :IMPORT-FROM with no symbol list to import all external symbols."
-          (let* ((import-from (loop for (key . args) in options
-                                    when (eq key :import-from)
-                                    collect args))
-                 (other-options (remove :import-from options :key #'car)))
-            `(defpackage ,name
-               ,@other-options
-               ,@(loop for (pkg . syms) in import-from
-                       collect `(:import-from ,pkg ,@syms)))))
+          (defmacro define-package (name &rest options)
+            "Define a package like DEFPACKAGE but with a few extensions.
+          Supports :IMPORT-FROM with no symbol list to import all external symbols."
+            (let* ((import-from (loop for (key . args) in options
+                                      when (eq key :import-from)
+                                      collect args))
+                   (other-options (remove :import-from options :key #'car)))
+              `(defpackage ,name
+                 ,@other-options
+                 ,@(loop for (pkg . syms) in import-from
+                         collect `(:import-from ,pkg ,@syms)))))
 
-        (defun init (&key load-contribs)
-          "No-op init function for compatibility."
-          (declare (ignore load-contribs))
-          t)
-      '';
-    in
+          (defun init (&key load-contribs)
+            "No-op init function for compatibility."
+            (declare (ignore load-contribs))
+            t)
+        '';
+      in
       buildLisp.library {
         name = "swank";
         deps = [ bordeaux-threads ];
@@ -1557,4 +1750,5 @@ let
       };
   };
 
-in { inherit buildLisp lisp; }
+in
+{ inherit buildLisp lisp; }

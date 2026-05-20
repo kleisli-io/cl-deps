@@ -8,10 +8,13 @@
   outputs = { nixpkgs, ... }:
     let
       forAllSystems = nixpkgs.lib.genAttrs [
-        "x86_64-linux" "aarch64-linux"
-        "x86_64-darwin" "aarch64-darwin"
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
       ];
-    in {
+    in
+    {
       lib = forAllSystems (system:
         let pkgs = nixpkgs.legacyPackages.${system};
         in import ./default.nix { inherit pkgs; lib = pkgs.lib; });
