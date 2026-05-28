@@ -1458,6 +1458,21 @@ let
         ];
       };
 
+    lack-test =
+      let
+        lackSrc = pkgs.fetchFromGitHub {
+          owner = "fukamachi";
+          repo = "lack";
+          rev = "master";
+          sha256 = "sha256-588UafCp5t5nX09YyQc0MrV6WGalLrbDyZRqqpyyX7U=";
+        };
+      in
+      buildLisp.library {
+        name = "lack-test";
+        deps = [ quri cl-cookie flexi-streams lack ];
+        srcs = [ "${lackSrc}/src/test.lisp" ];
+      };
+
     clack =
       let
         clackSrc = pkgs.fetchFromGitHub {
