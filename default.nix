@@ -3,17 +3,16 @@
 # Consumed as a flake input by kli and other CL projects.
 
 { pkgs, lib, mb, fx
-, sandbox ? throw "cl-deps.buildLisp: sandbox profiles are unavailable in the standalone flake; build in-tree (world) for sandboxed programs."
+, sandbox ? throw "cl-deps.buildLisp: sandbox profiles are not available in the standalone distribution."
 , ...
 }:
 
 let
-  # buildLisp is the metaBuilderOrn-based builder, vendored verbatim under
-  # ./buildLisp (drift-checked: `diff -r nix/buildLispOrn nix/cl-deps/buildLisp`).
-  # It takes a `world`; we synthesize exactly the five paths its tree touches
-  # from the injected args. In-tree these come from .readtree-args.nix (the live
-  # monorepo mb/fx/sandbox); as a flake they come from metaBuilder/nix-effects
-  # inputs. `lib.fix` supplies the buildLisp self-reference grovel/tests need.
+  # buildLisp is the metaBuilder-based builder, vendored verbatim under
+  # ./buildLisp. It takes a `world`-shaped record; we synthesize exactly the
+  # paths its tree touches from the injected args (mb/fx from the
+  # metaBuilder/nix-effects flake inputs; sandbox is unavailable standalone).
+  # `lib.fix` supplies the buildLisp self-reference grovel/tests need.
   buildLisp = (lib.fix (self: import ./buildLisp {
     world = {
       nix.metaBuilderOrn = mb;
