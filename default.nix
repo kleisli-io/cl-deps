@@ -2,10 +2,32 @@
 #
 # Consumed as a flake input by kli and other CL projects.
 
-{ pkgs, lib, ... }:
+{ pkgs, lib, mb, fx
+, sandbox ? throw "cl-deps.buildLisp: sandbox profiles are unavailable in the standalone flake; build in-tree (world) for sandboxed programs."
+, ...
+}:
 
 let
-  buildLisp = import ./buildLisp.nix { inherit pkgs lib; };
+  # buildLisp is the metaBuilderOrn-based builder, vendored verbatim under
+  # ./buildLisp (drift-checked: `diff -r nix/buildLispOrn nix/cl-deps/buildLisp`).
+  # It takes a `world`; we synthesize exactly the five paths its tree touches
+  # from the injected args. In-tree these come from .readtree-args.nix (the live
+  # monorepo mb/fx/sandbox); as a flake they come from metaBuilder/nix-effects
+  # inputs. `lib.fix` supplies the buildLisp self-reference grovel/tests need.
+  buildLisp = (lib.fix (self: import ./buildLisp {
+    world = {
+      nix.metaBuilderOrn = mb;
+      nix.nix-effects = fx;
+      nix.buildLispOrn = self;
+      third_party.languages.lisp = lisp;
+      lib.sandbox = sandbox;
+    };
+    inherit pkgs lib;
+  })) // {
+    # Canonical runtime resource-support source, exposed so a vendored copy
+    # can be drift-checked against it.
+    resourceSupportLisp = ./buildLisp/runtime/resources.lisp;
+  };
 
   lisp = rec {
 
@@ -913,7 +935,7 @@ let
           uiop
           sb-posix
         ];
-        native = [ pkgs.openssl ];
+        cLibraries = [ pkgs.openssl ];
         srcs = map (f: src + ("/src/" + f)) [
           "config.lisp"
           "package.lisp"
@@ -1158,6 +1180,9 @@ let
           ./let-over-lambda/package.lisp
           ./let-over-lambda/let-over-lambda.lisp
         ];
+        # Sources are vendored from thephoeron/let-over-lambda at this commit.
+        # Recorded so the qlot qlfile pin can be drift-checked against the canonical.
+        passthru = { rev = "9b3751213b1cb0bc1ddf11cd7a53f8f620fe9125"; };
       };
 
     hunchentoot =
@@ -1730,6 +1755,221 @@ let
           (src "contrib/swank-arglists.lisp")
           (src "contrib/swank-fuzzy.lisp")
         ];
+      };
+
+    # ===================================================================
+    # Markdown / HTTP / SQLite / diff
+    # ===================================================================
+
+    html-encode =
+      let
+        src = pkgs.fetchurl {
+          url = "https://beta.quicklisp.org/orphans/html-encode-1.2.tgz";
+          sha256 = "06mf8wn95yf5swhmzk4vp0xr4ylfl33dgfknkabbkd8n6jns8gcf";
+        };
+        unpacked = pkgs.runCommand "html-encode-src" { } ''
+          mkdir -p $out
+          tar xzf ${src} --strip-components=1 -C $out
+        '';
+      in
+      buildLisp.library {
+        name = "html-encode";
+        srcs = [ (unpacked + "/html-encode.lisp") ];
+      };
+
+    trivial-with-current-source-form =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "scymtym";
+          repo = "trivial-with-current-source-form";
+          rev = "master";
+          sha256 = "0y1gmgbcpx669pr6nqm16ic7dc0klx21qsnr4hg5c3r31ffyirkw";
+        };
+      in
+      buildLisp.library {
+        name = "trivial-with-current-source-form";
+        srcs = [
+          (src + "/code/package.lisp")
+          {
+            sbcl = src + "/code/sbcl.lisp";
+            default = src + "/code/unsupported.lisp";
+          }
+          (src + "/code/macro.lisp")
+        ];
+      };
+
+    esrap =
+      let
+        src = pkgs.fetchFromGitHub {
+          owner = "scymtym";
+          repo = "esrap";
+          rev = "master";
+          sha256 = "0nd1g4gwv12g196x6p2k9zzil0rp9r8qc247bassyn8nfm2ycv6d";
+        };
+      in
+      buildLisp.library {
+        name = "esrap";
+        deps = [ alexandria trivial-with-current-source-form ];
+        srcs = map (f: src + ("/src/" + f)) [
+          "package.lisp"
+          "types.lisp"
+          "protocol.lisp"
+          "variables.lisp"
+          "conditions.lisp"
+          "expressions.lisp"
+          "rule.lisp"
+          "results.lisp"
+          "cache/chunk.lisp"
+          "cache/packrat.lisp"
+          "context.lisp"
+          "evaluator.lisp"
+          "macros.lisp"
+          "interface.lisp"
+          "editor-support.lisp"
+        ];
+      };
+
+    colorize =
+      let
+        rev = "c41fcc5833ebcf184f48aaf31ab89a9a1c230464";
+        # Upstream ships `(defvar *debug* t)`, logging "Scan was called N times."
+        # to *trace-output* on every scan-string call. Default it off.
+        src = pkgs.applyPatches {
+          src = pkgs.fetchFromGitHub {
+            owner = "kingcons";
+            repo = "colorize";
+            inherit rev;
+            sha256 = "0wgnmpfn9z6xcvf87inlgpr3xhc2xbly5k9aifgvjwpmw9994m65";
+          };
+          postPatch = ''
+            sed -i 's/(defvar \*debug\* t/(defvar *debug* nil/' colorize.lisp
+          '';
+        };
+      in
+      buildLisp.library {
+        name = "colorize";
+        deps = [ html-encode split-sequence alexandria ];
+        srcs = map (f: src + ("/" + f)) [
+          "colorize-package.lisp"
+          "coloring-css.lisp"
+          "colorize.lisp"
+          "abbrev.lisp"
+          "clhs-lookup.lisp"
+          "r5rs-lookup.lisp"
+          "elisp-lookup.lisp"
+          "coloring-support.lisp"
+          "coloring-types.lisp"
+        ];
+        passthru = { inherit rev; };
+      };
+
+    cl-difflib =
+      let
+        rev = "98eb335c693f1881584b83ca7be4a0fe05355c4e";
+        src = pkgs.fetchFromGitHub {
+          owner = "wiseman";
+          repo = "cl-difflib";
+          inherit rev;
+          hash = "sha256-iOB6ichf4umGIByi+7m2oWCsHNr96PRZDyk8DJcCLiI=";
+        };
+      in
+      buildLisp.library {
+        name = "cl-difflib";
+        srcs = [
+          (src + "/package.lisp")
+          (src + "/difflib.lisp")
+        ];
+        passthru = { inherit rev; };
+      };
+
+    "3bmd" =
+      let
+        rev = "f850c88c34ac6f8c6a63e61aba2e677a6844648f";
+        src = pkgs.fetchFromGitHub {
+          owner = "3b";
+          repo = "3bmd";
+          inherit rev;
+          sha256 = "148if19cjb08l6k347jzhwnymj5a8hmr4fm9r5hr17ddcbbq8sbv";
+        };
+      in
+      buildLisp.library {
+        name = "3bmd";
+        deps = [ esrap split-sequence alexandria ];
+        srcs = map (f: src + ("/" + f)) [
+          "package.lisp"
+          "parser.lisp"
+          "extensions.lisp"
+          "smart-quotes.lisp"
+          "printer.lisp"
+          "markdown-printer.lisp"
+          "plain-printer.lisp"
+        ];
+        passthru = { inherit src rev; };
+      };
+
+    "3bmd-ext-code-blocks" =
+      buildLisp.library {
+        name = "3bmd-ext-code-blocks";
+        deps = [ lisp."3bmd" colorize alexandria split-sequence (buildLisp.bundled "uiop") ];
+        srcs = [ (lisp."3bmd".passthru.src + "/code-blocks.lisp") ];
+      };
+
+    "3bmd-ext-tables" =
+      buildLisp.library {
+        name = "3bmd-ext-tables";
+        deps = [ lisp."3bmd" alexandria split-sequence ];
+        srcs = [ (lisp."3bmd".passthru.src + "/tables.lisp") ];
+      };
+
+    drakma =
+      let src = pkgs.srcOnly pkgs.sbcl.pkgs.drakma; in
+      buildLisp.library {
+        name = "drakma";
+        deps = [
+          chipz
+          chunga
+          cl-base64
+          cl-plus-ssl
+          cl-ppcre
+          flexi-streams
+          puri
+          usocket
+          (buildLisp.bundled "asdf")
+        ];
+        srcs = map (f: src + ("/" + f)) [
+          "drakma.asd" # Required because the system definition is used
+          "packages.lisp"
+          "specials.lisp"
+          "conditions.lisp"
+          "util.lisp"
+          "read.lisp"
+          "cookies.lisp"
+          "encoding.lisp"
+          "request.lisp"
+        ];
+        brokenOn = [ "ecl" ]; # dynamic cffi
+      };
+
+    sqlite =
+      let
+        rev = "be2fcc193f98e3d5bdc85958a806d612cc48740c";
+        src = pkgs.fetchFromGitHub {
+          owner = "TeMPOraL";
+          repo = "cl-sqlite";
+          inherit rev;
+          hash = "sha256-kzxfH8vPAZ6gxnVbFjdotL1sQSiO4M1ExwdCUMk6OyI=";
+        };
+      in
+      buildLisp.library {
+        name = "sqlite";
+        deps = [ iterate cffi ];
+        cLibraries = [ pkgs.sqlite ];
+        srcs = [
+          (src + "/sqlite-ffi.lisp")
+          (src + "/cache.lisp")
+          (src + "/sqlite.lisp")
+        ];
+        passthru = { inherit rev; };
       };
 
     # ===================================================================
