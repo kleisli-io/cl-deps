@@ -22,7 +22,7 @@
 #
 # TestSpec ≡ { name? ; srcs? ; deps? ; expression ; commandTools? }.
 
-{ lib, runCommand, writeText, mb, implFilter, allDeps, allNative, testSuite, defaultImplementation, validateSpec }:
+{ lib, runCommand, writeText, mb, implFilter, allDeps, allNative, testSuite, defaultImplementation, validateSpec, isDarwin }:
 
 let
   toolEnvOrn = mb.ornaments.toolEnv;
@@ -89,7 +89,7 @@ let
   };
 in
 builtins.seq _validated (lib.fix (self: runCommand "${name}-cllib"
-{
+({
   nativeBuildInputs = toolEnvOrn.toolInputs toolEnv;
   LD_LIBRARY_PATH = lib.makeLibraryPath lispNativeDeps;
   LANG = "C.UTF-8";
@@ -107,7 +107,12 @@ builtins.seq _validated (lib.fix (self: runCommand "${name}-cllib"
   } // lib.optionalAttrs (replInit != null) {
     inherit replInit;
   };
-} ''
+}
+  # dyld ignores LD_LIBRARY_PATH; expose native libs to it on macOS so
+  # bare-soname loads (e.g. cl+ssl's libcrypto.3.dylib) resolve at build.
+  // lib.optionalAttrs isDarwin {
+    DYLD_LIBRARY_PATH = lib.makeLibraryPath lispNativeDeps;
+  }) ''
     ${toolEnvOrn.toExportSnippet toolEnv}
     ${if testDrv != null
       then "echo 'Test ${testDrv} succeeded'"

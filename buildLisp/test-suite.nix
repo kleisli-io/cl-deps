@@ -11,7 +11,7 @@
 #   , commandTools   : { name = Package; } ? {}
 #   }
 
-{ lib, runCommand, mb, implFilter, allDeps, allNative }:
+{ lib, runCommand, mb, implFilter, allDeps, allNative, isDarwin }:
 
 let
   toolEnvOrn = mb.ornaments.toolEnv;
@@ -35,11 +35,15 @@ let
   toolEnv = toolEnvOrn.create commandTools;
 in
 runCommand name
-{
+({
   nativeBuildInputs = toolEnvOrn.toolInputs toolEnv;
   LD_LIBRARY_PATH = lib.makeLibraryPath lispNativeDeps;
   LANG = "C.UTF-8";
-} ''
+} // lib.optionalAttrs isDarwin {
+  # dyld ignores LD_LIBRARY_PATH; expose native libs to it on macOS so
+  # bare-soname loads resolve while compiling the test image.
+  DYLD_LIBRARY_PATH = lib.makeLibraryPath lispNativeDeps;
+}) ''
   ${toolEnvOrn.toExportSnippet toolEnv}
   echo "Running test suite ${name}"
 

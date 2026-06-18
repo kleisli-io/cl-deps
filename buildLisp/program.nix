@@ -298,6 +298,10 @@ builtins.seq _validated (lib.fix (self: runCommand name
     nativeBuildInputs = lib.unique ([ makeWrapper ] ++ toolEnvOrn.toolInputs toolEnv);
     LD_LIBRARY_PATH = libPath;
     LANG = "C.UTF-8";
+  } // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+    # dyld ignores LD_LIBRARY_PATH; expose native libs to it on macOS so
+    # bare-soname loads resolve when dumping the image.
+    DYLD_LIBRARY_PATH = libPath;
   } // lib.optionalAttrs (dynamicSpaceSize != null) {
     NIX_BUILDLISP_LISP_ARGS = "--dynamic-space-size ${toString dynamicSpaceSize}";
   } // {

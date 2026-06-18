@@ -10,6 +10,7 @@
 let
   inherit (pkgs) runCommand writeText writeShellScriptBin sbcl ecl ccl rlwrap writers;
   inherit (pkgs.stdenv) targetPlatform;
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
 
   toolEnvOrn = mb.ornaments.toolEnv;
   implsOrn = mb.ornaments.implementations;
@@ -61,11 +62,11 @@ let
       defaultImplementation = impls.sbcl;
 
       testSuite = import ./test-suite.nix {
-        inherit lib runCommand mb implFilter allDeps allNative;
+        inherit lib runCommand mb implFilter allDeps allNative isDarwin;
       };
 
       libraryBuilder = import ./library.nix {
-        inherit lib runCommand writeText mb implFilter allDeps allNative testSuite defaultImplementation validateSpec;
+        inherit lib runCommand writeText mb implFilter allDeps allNative testSuite defaultImplementation validateSpec isDarwin;
       };
 
       programBuilder = import ./program.nix {
