@@ -1,0 +1,162 @@
+# Package a buildLisp.program into a self-contained, relocatable directory tree.
+# On Linux the only host contract is the Linux syscall ABI; on macOS it is the
+# system dynamic linker at /usr/lib/dyld -- a stable OS path present on every Mac.
+#
+# A save-lisp-and-die image carries its Lisp core appended to the executable,
+# which the runtime locates by scanning itself; rewriting the executable
+# (patchelf on ELF, install_name_tool on Mach-O) shifts that and breaks core
+# lookup -- and on macOS also invalidates the code signature the kernel demands.
+# So the image is shipped byte-for-byte on both platforms and its baked
+# /nix/store references are left intact; the generated launcher overrides library
+# resolution at runtime instead, with the bundle's lib/ on the search path.
+#
+#   Linux: the image's PT_INTERP is an absolute /nix/store loader the kernel
+#   resolves literally (ignoring LD_LIBRARY_PATH), so with /nix/store absent
+#   execve itself fails. The bundled loader is invoked explicitly to sidestep it.
+#
+#   macOS: dyld lives at /usr/lib/dyld regardless of /nix/store, so there is no
+#   interpreter problem. The image's LC_LOAD_DYLIB entries are absolute /nix/store
+#   paths, but dyld searches DYLD_LIBRARY_PATH by leaf name -- before the
+#   load-command path -- so a bundled lib/ shadows the dead store references with
+#   no rewriting (and thus no broken core, no invalidated signature).
+#
+# The complete runtime closure travels with the artifact:
+#
+#   bin/<launcher>          /bin/sh trampoline (no store path)
+#   bin/.<name>-wrapped     the raw dumped image (untouched)
+#   lib/<loader>            (Linux only) the image's own dynamic loader
+#   lib/<deps...>           transitively-linked shared objects (ldd / otool -L)
+#   lib/<dlopen sonames>    libs the image reopens by SONAME at boot (see below)
+#   share/...               resource roots (KLI_DATA_DIR points here)
+#
+# The dlopen'd set is NOT in the load commands (the image loads it via dlopen),
+# so ldd/otool cannot see it. Rather than hand-list sonames -- which rots when
+# the closure moves -- the set is read from the image itself: `dlopenProbe` is a
+# sibling program that prints `blessed-sonames: a, b, c`, the same source of
+# truth the runtime reopen hook uses. Each soname is then resolved against the
+# program's own Nix closure, so the shipped file is exactly the one the image
+# loaded.
+
+{ pkgs, lib, validateSpec }:
+
+{ name
+, program
+, share ? null
+, dataDir ? null
+, dlopenProbe ? null
+, launcherName ? name
+}:
+
+let
+  _validated = validateSpec {
+    kind = "relocatableBundle";
+    inherit name;
+    spec = { inherit name program share dataDir dlopenProbe launcherName; };
+  };
+
+  inherit (pkgs) runCommand;
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+  imageName = ".${name}-wrapped";
+
+  launcher = pkgs.writeText "${name}-launcher" (''
+    #!/bin/sh
+    _dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+    _root=$(CDPATH= cd -- "$_dir/.." && pwd)
+  '' + lib.optionalString (dataDir != null) ''
+    export KLI_DATA_DIR="''${KLI_DATA_DIR:-$_root/${dataDir}}"
+  '' + (if isDarwin then ''
+    export DYLD_LIBRARY_PATH="$_root/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+    exec "$_dir/${imageName}" -- "$@"
+  '' else ''
+    exec "$_root/lib/@LOADER@" --library-path "$_root/lib" "$_dir/${imageName}" -- "$@"
+  ''));
+in
+builtins.seq _validated (runCommand "${name}-relocatable"
+  ({
+    __structuredAttrs = true;
+    exportReferencesGraph.closure =
+      [ program ] ++ lib.optional (dlopenProbe != null) dlopenProbe.drv;
+    nativeBuildInputs = [ pkgs.jq ]
+      ++ (if isDarwin then [ pkgs.darwin.cctools ]
+          else [ pkgs.patchelf pkgs.glibc.bin ]);
+    storeDir = builtins.storeDir;
+    inherit imageName launcherName;
+    passthru = { inherit program; };
+  })
+  (''
+    set -euo pipefail
+    mkdir -p "$out/bin" "$out/lib" "$out/share"
+
+    img=${program}/bin/${imageName}
+    cp "$img" "$out/bin/$imageName"
+    chmod u+w "$out/bin/$imageName"
+    chmod +x "$out/bin/$imageName"
+
+  '' + (if isDarwin then ''
+    # 1+2. Transitive LC_LOAD_DYLIB closure, keyed by leaf name. otool -L lists
+    #      only DIRECT load commands (unlike ldd, which is transitive), so walk
+    #      to a fixpoint. Only /nix/store dylibs are bundled; /usr/lib and
+    #      /System dylibs live in dyld's shared cache and must never be shipped.
+    #      No loader is bundled -- dyld at /usr/lib/dyld is always present.
+    queue=$(otool -L "$out/bin/$imageName" | awk 'NR>1 {print $1}')
+    seen=" "
+    while [ -n "$queue" ]; do
+      next=""
+      for path in $queue; do
+        case "$path" in "$storeDir"/*) ;; *) continue ;; esac
+        leaf=$(basename "$path")
+        case "$seen" in *" $leaf "*) continue ;; esac
+        seen="$seen$leaf "
+        cp -L "$path" "$out/lib/$leaf"
+        next="$next $(otool -L "$path" | awk 'NR>1 {print $1}')"
+      done
+      queue="$next"
+    done
+  '' else ''
+    # 1. The image's own dynamic loader (its PT_INTERP target). We ship and invoke
+    #    it explicitly rather than rewriting the image's interpreter.
+    interp=$(patchelf --print-interpreter "$img")
+    loader=$(basename "$interp")
+    cp -L "$interp" "$out/lib/$loader"
+
+    # 2. Transitive DT_NEEDED, resolved against the build closure (ldd works here
+    #    because /nix/store is present at build time). Keyed by SONAME.
+    ldd "$img" | awk '/=>/ && $3 ~ /^\// { print $1, $3 }' | while read -r soname path; do
+      case "$soname" in */*) continue ;; esac
+      cp -L "$path" "$out/lib/$soname"
+    done
+  '') + ''
+
+    # 3. dlopen'd libs the image reopens by SONAME at boot. Sonames come from the
+    #    image's own probe (the runtime source of truth); each is resolved from
+    #    the program's Nix closure so the shipped file matches what was loaded.
+    ${lib.optionalString (dlopenProbe != null) ''
+      mapfile -t closure < <(jq -r '.closure | map(.path) | .[]' "$NIX_ATTRS_JSON_FILE")
+      sonames=$(${dlopenProbe.drv}/bin/${dlopenProbe.bin} 2>/dev/null \
+                  | sed -n 's/^blessed-sonames:[[:space:]]*//p' | tr ',' ' ' || true)
+      for soname in $sonames; do
+        soname=$(printf '%s' "$soname" | tr -d '[:space:]')
+        [ -n "$soname" ] || continue
+        [ -e "$out/lib/$soname" ] && continue
+        found=$(find "''${closure[@]}" -name "$soname" -print -quit 2>/dev/null || true)
+        if [ -z "$found" ]; then
+          echo "mkRelocatableBundle: blessed soname '$soname' not found in closure" >&2
+          exit 1
+        fi
+        cp -L "$found" "$out/lib/$soname"
+      done
+    ''}
+
+    # 4. Resources.
+    ${lib.optionalString (share != null) ''
+      cp -r ${share}/share/. "$out/share/"
+    ''}
+
+    # 5. Launcher.
+    cp ${launcher} "$out/bin/$launcherName"
+    chmod u+w "$out/bin/$launcherName"
+  '' + lib.optionalString (!isDarwin) ''
+    sed -i "s|@LOADER@|$loader|" "$out/bin/$launcherName"
+  '' + ''
+    chmod +x "$out/bin/$launcherName"
+  ''))

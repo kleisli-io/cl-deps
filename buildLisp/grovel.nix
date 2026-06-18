@@ -14,15 +14,11 @@
 #   , deps        : [LispPackage] ? []   # extra packages in the grovel SBCL
 #   }
 
-{ world, lib, pkgs, ... }:
+{ lib, pkgs, mb, lisp, buildLisp, ... }:
 
 let
-  mb = world.nix.metaBuilderOrn;
   cgOrn = mb.ornaments."code-gen";
   ops = mb.operations;
-
-  buildLisp = world.nix.buildLispOrn;
-  lisp = world.third_party.languages.lisp;
 
   # cffi-grovel resolves its common.h via the ASDF source registry.
   cffiSrc = pkgs.srcOnly pkgs.sbcl.pkgs.cffi;

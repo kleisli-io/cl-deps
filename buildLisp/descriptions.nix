@@ -1,4 +1,4 @@
-# Typed input contracts for the buildLispOrn builders.
+# Typed input contracts for the buildLisp builders.
 #
 # Each builder accepts an open attrset of arguments today. This module
 # declares HOAS product types over those argument shapes plus a
@@ -29,12 +29,9 @@
 # similar open-attrset slots type as `H.attrs`. Their inner shape is
 # validated downstream by the consumers that interpret them.
 
-{ world, lib, ... }:
+{ lib, mb, fx, ... }:
 
 let
-  fx = world.nix.nix-effects;
-  mb = world.nix.metaBuilderOrn;
-
   H = fx.types.hoas;
   validateValue = fx.types.validateValue;
 
@@ -153,11 +150,27 @@ let
     ];
   };
 
+  # Input contract for `mkRelocatableBundle` -- a post-program packaging
+  # transform, not a Lisp-source builder, so it is a standalone product
+  # rather than a LispScriptableSpec ornament (it carries no srcs /
+  # implementation / deps to coordinate). `program` is an already-built
+  # derivation; `dlopenProbe` is an open `{ drv; bin; }` attrset
+  # validated at the point of use, same convention as `tests`.
+  RelocatableBundleSpec = H.product "LispRelocatableBundleSpec" [
+    (H.field "name" H.string)
+    (H.field "program" H.derivation)
+    (H.field "share" (H.maybe H.derivation))
+    (H.field "dataDir" (H.maybe H.string))
+    (H.field "dlopenProbe" (H.maybe H.attrs))
+    (H.field "launcherName" H.string)
+  ];
+
   specTypeOf = kind:
     if kind == "library" then LispLibrarySpec.T
     else if kind == "program" then LispProgramSpec.T
     else if kind == "script" then LispScriptSpec.T
     else if kind == "daemon" then LispDaemonSpec.T
+    else if kind == "relocatableBundle" then RelocatableBundleSpec.T
     else throw "buildLisp.descriptions.specTypeOf: unknown kind '${kind}'";
 
   # All four spec types are ornaments rooted at LispScriptableSpec, so
@@ -165,6 +178,13 @@ let
   # the base `_con` by kernel invariant). The validator stamps this tag
   # on the user's untagged arg attrset before checking.
   rootConName = "LispScriptableSpec";
+
+  # The four Lisp-source spec types share the LispScriptableSpec base
+  # constructor; the relocatable bundle is a standalone product whose
+  # constructor is its own type name.
+  conNameOf = kind:
+    if kind == "relocatableBundle" then "LispRelocatableBundleSpec"
+    else rootConName;
 
   # Path segments expose pre-formatted `segment` strings (`.field` or
   # `[N]` style) directly from the kernel diagnostic walker. Concat
@@ -199,7 +219,7 @@ let
   validate = { kind, name, spec }:
     let
       ty = specTypeOf kind;
-      tagged = spec // { _con = rootConName; };
+      tagged = spec // { _con = conNameOf kind; };
       diagnostics = validateValue [ ] ty tagged;
       report =
         "buildLisp.${kind}[${name}]: ${toString (builtins.length diagnostics)} diagnostic(s):\n"
@@ -225,5 +245,6 @@ in
     LispProgramSpec
     LispScriptSpec
     LispDaemonSpec
+    RelocatableBundleSpec
     validate;
 }

@@ -1,4 +1,4 @@
-# Shared swank-codegen plumbing for the buildLispOrn builders.
+# Shared swank-codegen plumbing for the buildLisp builders.
 #
 # `codegenConfig` projects a typed `REPLServerSpec` (kernel
 # `mb.descriptions.REPLServerSpec`) into the string-keyed record that

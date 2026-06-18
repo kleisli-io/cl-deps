@@ -3,7 +3,7 @@
 # embed Swank with the protocol/mode/registration/style projected from
 # a typed `REPLServerSpec` via the consumer's `codegenConfig`.
 
-{ world, lib, pkgs, ... }:
+{ lib, ... }:
 
 {
   swankCodegen = import ./swank-codegen.nix { inherit lib; };

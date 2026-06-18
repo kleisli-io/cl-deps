@@ -48,7 +48,7 @@
 #     mode = mb.ornaments.replServer.Mode.Foreground;
 #   };
 
-{ world, lib, pkgs, mb, programBuilder, libraryBuilder, swankLib, swankCodegen, defaultImplementation, validateSpec }:
+{ sandbox, lib, pkgs, mb, programBuilder, libraryBuilder, swankLib, swankCodegen, defaultImplementation, validateSpec }:
 
 let
   replOrn = mb.ornaments.replServer;
@@ -125,7 +125,7 @@ let
   wrapperDeps =
     deps
     ++ lib.optional swankEnabled swankLib
-    ++ lib.optional sandboxEnabled world.lib.sandbox;
+    ++ lib.optional sandboxEnabled sandbox;
 
   daemonWrapperLib = libraryBuilder {
     name = "${name}-repl-wrapper";

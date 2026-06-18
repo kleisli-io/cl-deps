@@ -1,28 +1,24 @@
-# buildLisp — Common Lisp package builder over metaBuilderOrn.
+# buildLisp — Common Lisp package builder over metaBuilder.
 #
 # Public surface: library / program / daemon / script / bundled / grovel
 # / repl / serviceSpec, plus per-impl entry points (sbcl / ecl / ccl /
 # sbclWith) and the orn coordination layer (toolEnv / implementations /
 # extend / withTools).
 
-{ world, pkgs, lib, ... }:
+{ pkgs, lib, mb, fx, swankLib, lisp, sandbox ? null, buildLisp, ... }:
 
 let
   inherit (pkgs) runCommand writeText writeShellScriptBin sbcl ecl ccl rlwrap writers;
   inherit (pkgs.stdenv) targetPlatform;
 
-  mb = world.nix.metaBuilderOrn;
-  fx = world.nix.nix-effects;
   toolEnvOrn = mb.ornaments.toolEnv;
   implsOrn = mb.ornaments.implementations;
   depsOrn = mb.ornaments.dependencies;
 
-  # Swank lib + codegen used by program/script/daemon when REPL
-  # embedding is requested. `swankCodegen` lives in this tree's repl/
-  # (no `meta.*` deps; pure Lisp-code generator over the typed
-  # `codegenConfig` projection).
-  swankLib = world.third_party.languages.lisp.swank;
-  swankCodegen = (import ./repl { inherit world lib pkgs; }).swankCodegen;
+  # Swank codegen lives in this tree's repl/ (no `meta.*` deps; pure
+  # Lisp-code generator over the typed `codegenConfig` projection). The
+  # swank library itself is supplied as an argument.
+  swankCodegen = (import ./repl { inherit lib; }).swankCodegen;
 
   implFilter = implsOrn.filterByName;
 
@@ -52,7 +48,7 @@ let
     overrideLisp = new: makeOverridable f (orig // (new orig));
   };
 
-  descriptions = import ./descriptions.nix { inherit world lib; };
+  descriptions = import ./descriptions.nix { inherit lib mb fx; };
   validateSpec = descriptions.validate;
 
   mkBuildLisp = { baseToolEnv }:
@@ -73,7 +69,7 @@ let
       };
 
       programBuilder = import ./program.nix {
-        inherit world lib pkgs fx mb implFilter allDeps allNative
+        inherit lib pkgs fx mb sandbox implFilter allDeps allNative
           testSuite defaultImplementation libraryBuilder
           swankLib swankCodegen validateSpec;
       };
@@ -85,7 +81,7 @@ let
       };
 
       daemonBuilder = import ./daemon.nix {
-        inherit world lib pkgs mb libraryBuilder swankLib swankCodegen
+        inherit lib pkgs mb sandbox libraryBuilder swankLib swankCodegen
           defaultImplementation validateSpec;
         programBuilder = programBuilder;
       };
@@ -134,9 +130,10 @@ let
 
 in
 mkBuildLisp { baseToolEnv = toolEnvOrn.empty; } // {
-  grovel = import ./grovel.nix { inherit world pkgs lib; };
-  repl = import ./repl { inherit world lib pkgs; };
+  grovel = import ./grovel.nix { inherit pkgs lib mb lisp buildLisp; };
+  repl = import ./repl { inherit lib; };
   serviceSpec = import ./service-spec.nix { inherit lib; };
+  mkRelocatableBundle = import ./relocatable-bundle.nix { inherit pkgs lib; validateSpec = descriptions.validate; };
   inherit descriptions;
-  tests = import ./tests { inherit world lib pkgs; };
+  tests = import ./tests { inherit lib pkgs mb buildLisp; };
 }

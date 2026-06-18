@@ -8,20 +8,17 @@
 }:
 
 let
-  # buildLisp is the metaBuilder-based builder, vendored verbatim under
-  # ./buildLisp. It takes a `world`-shaped record; we synthesize exactly the
-  # paths its tree touches from the injected args (mb/fx from the
-  # metaBuilder/nix-effects flake inputs; sandbox is unavailable standalone).
-  # `lib.fix` supplies the buildLisp self-reference grovel/tests need.
+  # buildLisp is the metaBuilder-based builder, vendored under ./buildLisp.
+  # It takes its build dependencies (metaBuilder, nix-effects, swank, the
+  # lisp set, sandbox) as explicit arguments rather than reaching into a
+  # global record, so the vendored tree stays self-contained. mb/fx come from
+  # the metaBuilder/nix-effects flake inputs; sandbox is unavailable
+  # standalone. `lib.fix` supplies the buildLisp self-reference grovel and
+  # tests need.
   buildLisp = (lib.fix (self: import ./buildLisp {
-    world = {
-      nix.metaBuilderOrn = mb;
-      nix.nix-effects = fx;
-      nix.buildLispOrn = self;
-      third_party.languages.lisp = lisp;
-      lib.sandbox = sandbox;
-    };
-    inherit pkgs lib;
+    inherit pkgs lib mb fx sandbox lisp;
+    swankLib = lisp.swank;
+    buildLisp = self;
   })) // {
     # Canonical runtime resource-support source, exposed so a vendored copy
     # can be drift-checked against it.

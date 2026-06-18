@@ -1,4 +1,4 @@
-# Shared test-derivation construction for buildLispOrn builders.
+# Shared test-derivation construction for buildLisp builders.
 #
 # `mkTestDrv` resolves an optional `tests : TestSpec | Null` against the
 # impl-filtered srcs/deps the calling builder has already prepared.

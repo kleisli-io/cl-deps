@@ -1,9 +1,9 @@
-# buildLispOrn — eval-time test surface.
+# buildLisp — eval-time test surface.
 #
 # Each category is a typed `testSuite` of `testCase` records; `runPure`
 # evaluates the boolean bodies and produces per-suite pass/fail/skip/error
 # tallies. The top-level exposes a roll-up summary so consumers can hang a
-# CI gate off `world.nix.buildLispOrn.tests.allPass` without forcing a
+# CI gate off `buildLisp.tests.allPass` without forcing a
 # derivation build.
 #
 # Conventions:
@@ -13,11 +13,10 @@
 #     `replConfig`), `sandboxProfile`, `systemdHardening`, `serviceSpec`,
 #     `lib` (= selfLib), `isDaemon`, `isScript`, `originalMain`.
 
-{ world, lib, pkgs, ... }:
+{ lib, pkgs, mb, buildLisp, ... }:
 
 let
-  bl = world.nix.buildLispOrn;
-  mb = world.nix.metaBuilderOrn;
+  bl = buildLisp;
 
   testing = mb.ornaments.testing;
   sandboxOrn = mb.ornaments.sandbox;
@@ -749,12 +748,12 @@ let
   # Derivation-hash fixtures — locks shell-text byte content of runCommand
   # bodies. Eval-time invariants above verify type shape; this catches drift.
   # ============================================================================
-  derivationFixtures = import ./derivation-fixtures.nix { inherit world lib pkgs; };
+  derivationFixtures = import ./derivation-fixtures.nix { inherit lib pkgs mb buildLisp; };
 
   # ============================================================================
   # Typed input contracts — datatypes + validator behaviour.
   # ============================================================================
-  descriptionsTests = import ./descriptions.nix { inherit world lib pkgs; };
+  descriptionsTests = import ./descriptions.nix { inherit lib pkgs mb buildLisp; };
 
   # ============================================================================
   # Roll-up

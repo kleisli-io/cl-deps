@@ -1,19 +1,18 @@
-# Hash-fixture suite. Pins the outPath of representative buildLispOrn
+# Hash-fixture suite. Pins the outPath of representative buildLisp
 # invocations across library / program / script / daemon, with and without
 # swank and sandbox. Locks the shell-text byte content of generated
 # runCommand bodies — the eval-time invariant suites verify type-shape
 # stability but not shell-text drift; this suite covers that gap.
 #
 # Refresh workflow when an outPath legitimately moves:
-#   nix eval --json -f . 'nix.buildLispOrn.tests.fixtureActuals'
+#   nix eval --json '.#lib.x86_64-linux.buildLisp.tests.fixtureActuals'
 # then edit the matching `expected.<key>` after auditing the cause.
 # Never edit `expected` to mask an unexplained change.
 
-{ world, lib, pkgs, ... }:
+{ lib, pkgs, mb, buildLisp, ... }:
 
 let
-  bl = world.nix.buildLispOrn;
-  mb = world.nix.metaBuilderOrn;
+  bl = buildLisp;
 
   testing = mb.ornaments.testing;
   sandboxOrn = mb.ornaments.sandbox;

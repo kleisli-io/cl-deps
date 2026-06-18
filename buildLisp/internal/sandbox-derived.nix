@@ -1,4 +1,4 @@
-# Shared sandbox-derived values for the buildLispOrn binary builders.
+# Shared sandbox-derived values for the buildLisp binary builders.
 #
 # `landlock` is the typed projection consumed by the Lisp-side stage-2
 # enforcement; the env vars built from it never read directly from

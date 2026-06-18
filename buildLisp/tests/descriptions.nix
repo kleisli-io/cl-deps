@@ -1,10 +1,9 @@
-# Datatype + validator tests for buildLispOrn.descriptions.
+# Datatype + validator tests for buildLisp.descriptions.
 
-{ world, lib, pkgs, ... }:
+{ lib, pkgs, mb, buildLisp, ... }:
 
 let
-  bl = world.nix.buildLispOrn;
-  mb = world.nix.metaBuilderOrn;
+  bl = buildLisp;
   d = bl.descriptions;
 
   testing = mb.ornaments.testing;
@@ -70,9 +69,19 @@ let
   oneShotDaemonTry = builtins.tryEval (d.validate { kind = "daemon"; name = "ds-x"; spec = daemonOneShot; });
   fgDaemonOk = d.validate { kind = "daemon"; name = "ds-x"; spec = daemonForeground; };
 
+  bundleFields = {
+    name = "ds-x";
+    program = src;
+    share = null;
+    dataDir = null;
+    dlopenProbe = null;
+    launcherName = "ds-x";
+  };
+
   libOk = d.validate { kind = "library"; name = "ds-x"; spec = libFields; };
   progOk = d.validate { kind = "program"; name = "ds-x"; spec = progFields; };
   scriptOk = d.validate { kind = "script"; name = "ds-x"; spec = scriptFields; };
+  bundleOk = d.validate { kind = "relocatableBundle"; name = "ds-x"; spec = bundleFields; };
 
   suite = testSuite {
     name = "descriptions";
@@ -101,6 +110,10 @@ let
         name = "TestSpec datatype present";
         body = d.TestSpec ? T;
       }
+      {
+        name = "RelocatableBundleSpec datatype present";
+        body = d.RelocatableBundleSpec ? T;
+      }
 
       {
         name = "library spec roundtrips through validate";
@@ -113,6 +126,10 @@ let
       {
         name = "script spec roundtrips through validate";
         body = scriptOk.name == "ds-x";
+      }
+      {
+        name = "relocatableBundle spec roundtrips through validate";
+        body = bundleOk.name == "ds-x";
       }
       {
         name = "daemon spec with Foreground swank roundtrips";
