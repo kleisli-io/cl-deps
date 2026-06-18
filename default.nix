@@ -916,7 +916,24 @@ let
         srcs = [ (src + "/quasiquote-readtable.lisp") ];
       };
 
-    cl-plus-ssl = let src = pkgs.srcOnly pkgs.sbcl.pkgs.cl_plus_ssl; in
+    cl-plus-ssl = let
+      src = pkgs.srcOnly pkgs.sbcl.pkgs.cl_plus_ssl;
+      # Pin OpenSSL to the major-versioned soname the build links against, so it
+      # loads by bare soname through the loader search path like every other
+      # native library, instead of probing host install locations
+      # (Homebrew/MacPorts/system). On macOS that probe runs at load time and
+      # bakes an absolute host path into the dumped image -- not hermetic at
+      # build and not resolvable on another machine. This file is compiled
+      # after config.lisp (which defines the override macros and the
+      # *libcrypto-override* / *libssl-override* flags) and before reload.lisp
+      # (whose `unless *...-override*` then skips its own platform default), so
+      # the bare soname is what gets recorded against the loaded object.
+      sonameOverride = pkgs.writeText "cl-plus-ssl-soname-override.lisp" ''
+        (in-package #:cl-user)
+        #+darwin (cl+ssl/config:define-libcrypto-path "libcrypto.3.dylib")
+        #+darwin (cl+ssl/config:define-libssl-path "libssl.3.dylib")
+      '';
+    in
       buildLisp.library {
         name = "cl-plus-ssl";
         deps = [
@@ -932,8 +949,10 @@ let
           sb-posix
         ];
         cLibraries = [ pkgs.openssl ];
-        srcs = map (f: src + ("/src/" + f)) [
-          "config.lisp"
+        srcs = [
+          (src + "/src/config.lisp")
+          sonameOverride
+        ] ++ map (f: src + ("/src/" + f)) [
           "package.lisp"
           "reload.lisp"
           "ffi.lisp"

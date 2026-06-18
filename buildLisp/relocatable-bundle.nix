@@ -147,6 +147,28 @@ builtins.seq _validated (runCommand "${name}-relocatable"
       done
     ''}
 
+    ${lib.optionalString isDarwin ''
+      # Transitively close the bundled set. The libs gathered above (the image's
+      # own load commands and the dlopen'd blessed libs) may themselves pull
+      # further /nix/store dylibs by absolute path (e.g. sqlite -> libz); ship
+      # those too, keyed by leaf, so DYLD_LIBRARY_PATH resolves every sibling to
+      # the bundle rather than back into /nix/store.
+      changed=1
+      while [ "$changed" = 1 ]; do
+        changed=0
+        for dylib in "$out"/lib/*; do
+          [ -e "$dylib" ] || continue
+          for path in $(otool -L "$dylib" | awk 'NR>1 {print $1}'); do
+            case "$path" in "$storeDir"/*) ;; *) continue ;; esac
+            leaf=$(basename "$path")
+            [ -e "$out/lib/$leaf" ] && continue
+            cp -L "$path" "$out/lib/$leaf"
+            changed=1
+          done
+        done
+      done
+    ''}
+
     # 4. Resources.
     ${lib.optionalString (share != null) ''
       cp -r ${share}/share/. "$out/share/"
