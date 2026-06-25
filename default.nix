@@ -8,13 +8,6 @@
 }:
 
 let
-  # buildLisp is the metaBuilder-based builder, vendored under ./buildLisp.
-  # It takes its build dependencies (metaBuilder, nix-effects, swank, the
-  # lisp set, sandbox) as explicit arguments rather than reaching into a
-  # global record, so the vendored tree stays self-contained. mb/fx come from
-  # the metaBuilder/nix-effects flake inputs; sandbox is unavailable
-  # standalone. `lib.fix` supplies the buildLisp self-reference grovel and
-  # tests need.
   buildLisp = (lib.fix (self: import ./buildLisp {
     inherit pkgs lib mb fx sandbox lisp;
     swankLib = lisp.swank;
@@ -27,9 +20,7 @@ let
 
   lisp = rec {
 
-    # ===================================================================
     # SBCL bundled modules
-    # ===================================================================
 
     uiop = buildLisp.bundled "uiop";
     asdf = buildLisp.bundled "asdf";
@@ -38,9 +29,7 @@ let
     sb-posix = buildLisp.bundled "sb-posix";
     sb-rotate-byte = buildLisp.bundled "sb-rotate-byte";
 
-    # ===================================================================
     # Tier 0: leaf libraries (no CL deps)
-    # ===================================================================
 
     alexandria = let src = pkgs.srcOnly pkgs.sbcl.pkgs.alexandria; in
       buildLisp.library {
@@ -251,8 +240,6 @@ let
         srcs = [ (src + "/md5.lisp") ];
       };
 
-    # --- New from core ---
-
     iterate = let src = pkgs.srcOnly pkgs.sbcl.pkgs.iterate; in
       buildLisp.library {
         name = "iterate";
@@ -318,9 +305,7 @@ let
         srcs = [ "${src}/src.lisp" ];
       };
 
-    # ===================================================================
     # Tier 1: one level of deps
-    # ===================================================================
 
     bordeaux-threads =
       let
@@ -466,8 +451,6 @@ let
         ];
       };
 
-    # --- New from core ---
-
     nibbles =
       let
         src = pkgs.srcOnly (pkgs.sbcl.pkgs.nibbles.overrideAttrs (oldAttrs: {
@@ -490,7 +473,6 @@ let
           "macro-utils.lisp"
           "vectors.lisp"
           "streams.lisp"
-          # SBCL-specific optimizations (cl-deps is SBCL-only)
           "sbcl-opt/fndb.lisp"
           "sbcl-opt/nib-tran.lisp"
           "sbcl-opt/x86-vm.lisp"
@@ -498,9 +480,7 @@ let
         ];
       };
 
-    # ===================================================================
     # Tier 2: two levels deep
-    # ===================================================================
 
     cffi =
       let
@@ -508,7 +488,7 @@ let
         src = pkgs.applyPatches {
           name = "cffi-source-patched";
           src = baseSrc;
-          patches = [ ./cffi/cffi-initial-thread-timeout.patch ];
+          patches = [ ./patches/cffi-initial-thread-timeout.patch ];
         };
       in
       buildLisp.library {
@@ -628,8 +608,6 @@ let
         ];
       };
 
-    # --- New from core ---
-
     ironclad =
       let
         src = pkgs.srcOnly pkgs.sbcl.pkgs.ironclad;
@@ -651,7 +629,6 @@ let
           "generic.lisp"
           "macro-utils.lisp"
           "util.lisp"
-          # SBCL-specific optimizations (cl-deps is SBCL-only)
           "opt/sbcl/fndb.lisp"
           "opt/sbcl/x86oid-vm.lisp"
           "opt/sbcl/cpu-features.lisp"
@@ -859,9 +836,7 @@ let
         ];
       };
 
-    # ===================================================================
     # Tier 3: three levels deep
-    # ===================================================================
 
     static-vectors =
       let
@@ -970,8 +945,6 @@ let
         ];
       };
 
-    # --- New from core ---
-
     circular-streams =
       let
         src = pkgs.fetchFromGitHub {
@@ -1021,9 +994,7 @@ let
         ];
       };
 
-    # ===================================================================
     # Tier 4: four levels deep
-    # ===================================================================
 
     fast-io =
       let
@@ -1117,8 +1088,6 @@ let
         srcs = [ "${src}/src/cl-cookie.lisp" ];
       };
 
-    # --- New from core ---
-
     http-body =
       let
         src = pkgs.fetchFromGitHub {
@@ -1172,9 +1141,7 @@ let
         ];
       };
 
-    # ===================================================================
     # Tier 5: top-level direct deps
-    # ===================================================================
 
     yason = let src = pkgs.sbcl.pkgs.yason.src; in
       buildLisp.library {
@@ -1185,19 +1152,6 @@ let
           "parse.lisp"
           "encode.lisp"
         ];
-      };
-
-    let-over-lambda =
-      buildLisp.library {
-        name = "let-over-lambda";
-        deps = [ alexandria cl-ppcre named-readtables fare-quasiquote-readtable trivia-quasiquote ];
-        srcs = [
-          ./let-over-lambda/package.lisp
-          ./let-over-lambda/let-over-lambda.lisp
-        ];
-        # Sources are vendored from thephoeron/let-over-lambda at this commit.
-        # Recorded so the qlot qlfile pin can be drift-checked against the canonical.
-        passthru = { rev = "9b3751213b1cb0bc1ddf11cd7a53f8f620fe9125"; };
       };
 
     hunchentoot =
@@ -1309,9 +1263,7 @@ let
         ];
       };
 
-    # ===================================================================
-    # Clack/Lack ecosystem (new from core)
-    # ===================================================================
+    # Clack/Lack ecosystem
 
     lack-component =
       let
@@ -1471,15 +1423,6 @@ let
         srcs = [ "${lackSrc}/src/middleware/accesslog.lisp" ];
       };
 
-    # Vendored — Lack upstream ships no cors middleware. Source kept
-    # alongside this default.nix.
-    lack-middleware-cors =
-      buildLisp.library {
-        name = "lack-middleware-cors";
-        deps = [ ];
-        srcs = [ ./lack-middleware-cors/cors.lisp ];
-      };
-
     lack =
       let
         lackSrc = pkgs.fetchFromGitHub {
@@ -1596,9 +1539,7 @@ let
         ];
       };
 
-    # ===================================================================
-    # WebSocket Driver (new from core)
-    # ===================================================================
+    # WebSocket Driver
 
     websocket-driver-base =
       let
@@ -1679,9 +1620,7 @@ let
         ];
       };
 
-    # ===================================================================
     # Swank — SLIME's Common Lisp server
-    # ===================================================================
 
     swank =
       let
@@ -1694,7 +1633,7 @@ let
         patchedSlimeSrc = pkgs.applyPatches {
           name = "slime-source-patched";
           src = slimeSrc;
-          patches = [ ./swank-compile-file-fix.patch ];
+          patches = [ ./patches/swank-compile-file-fix.patch ];
         };
         src = f: "${patchedSlimeSrc}/${f}";
         packageLoader = pkgs.writeText "swank-package-loader.lisp" ''
@@ -1772,9 +1711,7 @@ let
         ];
       };
 
-    # ===================================================================
     # Markdown / HTTP / SQLite / diff
-    # ===================================================================
 
     html-encode =
       let
@@ -1987,24 +1924,12 @@ let
         passthru = { inherit rev; };
       };
 
-    # ===================================================================
     # Test-only deps
-    # ===================================================================
-
-    asdf-flv =
-      buildLisp.library {
-        name = "asdf-flv";
-        deps = [ asdf ];
-        srcs = [
-          ./asdf-flv/package.lisp
-          ./asdf-flv/asdf-flv.lisp
-        ];
-      };
 
     fiveam = let src = pkgs.srcOnly pkgs.sbcl.pkgs.fiveam; in
       buildLisp.library {
         name = "fiveam";
-        deps = [ alexandria asdf-flv trivial-backtrace ];
+        deps = [ alexandria lisp.asdf-flv trivial-backtrace ];
         srcs = map (f: src + ("/src/" + f)) [
           "package.lisp"
           "utils.lisp"
@@ -2018,7 +1943,7 @@ let
           "run.lisp"
         ];
       };
-  };
+  } // (import ./libs { inherit pkgs lib buildLisp; final = lisp; });
 
 in
 { inherit buildLisp lisp; }
