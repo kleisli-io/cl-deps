@@ -54,6 +54,21 @@
   (is (eq :clean (pr:reader-verdict "(list #\\( #\\))")))
   (is (eq :clean (pr:reader-verdict "#| ) ) ) |# (ok)"))))
 
+(test verdict-non-delimiter-read-errors
+  "A read failure with balanced parens is :indeterminate, not :unbalanced —
+parinfer can't and shouldn't repair it."
+  (is (eq :indeterminate (pr:reader-verdict ":a,b")))                 ; stray comma, no parens
+  (is (eq :indeterminate (pr:reader-verdict "(:k :grad-3,-4 v)")))    ; comma, balanced parens
+  (is (eq :indeterminate (pr:reader-verdict "#<foo>")))               ; unreadable #-syntax
+  (is (eq :unbalanced (pr:reader-verdict "(a,b))"))))                 ; comma but parens truly broken
+
+(test read-failure-reports-the-condition
+  "read-failure surfaces the underlying reader condition and a position."
+  (is (null (pr:read-failure "(a (b) c)")))
+  (multiple-value-bind (c offset) (pr:read-failure "(:k :grad-3,-4 v)")
+    (is-true (typep c 'reader-error))
+    (is-true (integerp offset))))
+
 ;;; ---- repair (exact goldens) ----
 
 (def-suite repair-suite :description "repair exact cases" :in all)

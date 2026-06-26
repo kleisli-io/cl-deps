@@ -8,11 +8,20 @@
    #:balanced-p
    #:repair-if-needed
    #:reader-verdict
+   #:read-failure
 
    ;; Layers
    #:tokenize
    #:parse
+   #:parse-faithful
    #:flatten
+
+   ;; Structural editing
+   #:replace-sexp
+   #:source-line-col
+
+   ;; Indentation
+   #:indent-region
 
    ;; Token
    #:tok
