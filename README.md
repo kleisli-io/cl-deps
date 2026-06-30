@@ -1,13 +1,13 @@
 # cl-deps
 
-Nix-native Common Lisp dependency set. Packages ~64 CL libraries for SBCL and provides `buildLisp`, a derivation-based builder for libraries and programs.
+Nix-native Common Lisp dependency set. Packages CL libraries for SBCL and provides `buildLisp`, a derivation-based builder for libraries and programs.
 
 ## What it does
 
 - **`buildLisp.library`** compiles Lisp sources into a FASL derivation with transitive dependency resolution
 - **`buildLisp.program`** produces a standalone SBCL executable with an embedded core
 - **`buildLisp.bundled`** exposes SBCL contrib modules (uiop, sb-posix, etc.)
-- **`lisp.*`** has ~64 library definitions ready to use: alexandria, hunchentoot, clack/lack, ironclad, cl-json, yason, parenscript, swank, and more
+- **`lisp.*`** has library definitions ready to use: alexandria, hunchentoot, clack/lack, ironclad, cl-json, yason, parenscript, swank, and more
 
 ## Usage
 
