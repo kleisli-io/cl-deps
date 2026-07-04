@@ -135,13 +135,13 @@ let
     fixLibDeps = "/nix/store/yg8jc71ff9xn5hqrv4gd8ghzyjkvcymd-fx-lib-deps-cllib";
     fixLibTests = "/nix/store/4xp0z9gqjvpagk6i8rwsqgf3q7dnaz3w-fx-lib-tests-cllib";
     fixProg = "/nix/store/mgv8z7h0bvln0sgpagwaccz4qqc5x5cq-fx-prog";
-    fixProgSwank = "/nix/store/qdsphy8gkxagka7644313xlfz3a3drq0-fx-prog-swank";
-    fixProgSandbox = "/nix/store/nrczvw8igpw9c6yssfgjbr04mgasr8d7-fx-prog-sandbox";
-    fixProgSwankSandbox = "/nix/store/m98m1kfnayfb4bcxrr6fyc4ax1iwlyxd-fx-prog-sw-sb";
+    fixProgSwank = "/nix/store/ddfpm8kg2r5ab1hwf86737f7b4yw0zxy-fx-prog-swank";
+    fixProgSandbox = "/nix/store/i8cfva0mmwi3l6gkzhk74kjsw9qz3sd2-fx-prog-sandbox";
+    fixProgSwankSandbox = "/nix/store/5bz8lyahf76rqp3xr5clv23qywrsnqsf-fx-prog-sw-sb";
     fixScript = "/nix/store/y46armpwh5ynaf1rcg1ab6msimxz9wxg-fx-script";
-    fixScriptSandbox = "/nix/store/02v45kjvg9qc9cj0ijh0rh2dxz5b60y7-fx-script-sandbox";
+    fixScriptSandbox = "/nix/store/7a4vgj9mfizl5dz67a57qj2d74k7m1kn-fx-script-sandbox";
     fixDaemon = "/nix/store/j3h6s097ikghnfgfibavnv1rxggy9akx-fx-daemon";
-    fixDaemonSwankSandbox = "/nix/store/zxjdjzgbxqnmshwmk8k3kpiklhr4nqyb-fx-daemon-sw-sb";
+    fixDaemonSwankSandbox = "/nix/store/9ybdb4bi47aiygi0fxk43hl5k7l4bjdp-fx-daemon-sw-sb";
   };
 
   actuals = lib.mapAttrs (_: drv: drv.outPath) derivations;

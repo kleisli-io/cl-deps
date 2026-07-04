@@ -23,11 +23,18 @@
 # The complete runtime closure travels with the artifact:
 #
 #   bin/<launcher>          /bin/sh trampoline (no store path)
-#   bin/.<name>-wrapped     the raw dumped image (untouched)
+#   bin/.<name>-wrapped     (Linux only) the raw dumped image (untouched)
+#   libexec/<launcher>      the exec'd entry: on Linux a copy of the dynamic
+#                           loader, on macOS the raw dumped image itself
 #   lib/<loader>            (Linux only) the image's own dynamic loader
 #   lib/<deps...>           transitively-linked shared objects (ldd / otool -L)
 #   lib/<dlopen sonames>    libs the image reopens by SONAME at boot (see below)
 #   share/...               resource roots (KLI_DATA_DIR points here)
+#
+# The kernel names a process (comm, cmdline[0] -- what ps/top/tmux show) after
+# the execve pathname, so the exec'd entry lives in libexec/ under the
+# launcher's name. The loader still passes the image path as the application's
+# argv[0], so runtime core lookup is unaffected.
 #
 # The dlopen'd set is NOT in the load commands (the image loads it via dlopen),
 # so ldd/otool cannot see it. Rather than hand-list sonames -- which rots when
@@ -66,9 +73,9 @@ let
     export KLI_DATA_DIR="''${KLI_DATA_DIR:-$_root/${dataDir}}"
   '' + (if isDarwin then ''
     export DYLD_LIBRARY_PATH="$_root/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-    exec "$_dir/${imageName}" -- "$@"
+    exec "$_root/libexec/${launcherName}" -- "$@"
   '' else ''
-    exec "$_root/lib/@LOADER@" --library-path "$_root/lib" "$_dir/${imageName}" -- "$@"
+    exec "$_root/libexec/${launcherName}" --library-path "$_root/lib" "$_dir/${imageName}" -- "$@"
   ''));
 in
 builtins.seq _validated (runCommand "${name}-relocatable"
@@ -85,20 +92,21 @@ builtins.seq _validated (runCommand "${name}-relocatable"
   })
   (''
     set -euo pipefail
-    mkdir -p "$out/bin" "$out/lib" "$out/share"
+    mkdir -p "$out/bin" "$out/lib" "$out/libexec" "$out/share"
 
     img=${program}/bin/${imageName}
-    cp "$img" "$out/bin/$imageName"
-    chmod u+w "$out/bin/$imageName"
-    chmod +x "$out/bin/$imageName"
 
   '' + (if isDarwin then ''
+    cp "$img" "$out/libexec/$launcherName"
+    chmod u+w "$out/libexec/$launcherName"
+    chmod +x "$out/libexec/$launcherName"
+
     # 1+2. Transitive LC_LOAD_DYLIB closure, keyed by leaf name. otool -L lists
     #      only DIRECT load commands (unlike ldd, which is transitive), so walk
     #      to a fixpoint. Only /nix/store dylibs are bundled; /usr/lib and
     #      /System dylibs live in dyld's shared cache and must never be shipped.
     #      No loader is bundled -- dyld at /usr/lib/dyld is always present.
-    queue=$(otool -L "$out/bin/$imageName" | awk 'NR>1 {print $1}')
+    queue=$(otool -L "$out/libexec/$launcherName" | awk 'NR>1 {print $1}')
     seen=" "
     while [ -n "$queue" ]; do
       next=""
@@ -113,11 +121,17 @@ builtins.seq _validated (runCommand "${name}-relocatable"
       queue="$next"
     done
   '' else ''
-    # 1. The image's own dynamic loader (its PT_INTERP target). We ship and invoke
-    #    it explicitly rather than rewriting the image's interpreter.
+    cp "$img" "$out/bin/$imageName"
+    chmod u+w "$out/bin/$imageName"
+    chmod +x "$out/bin/$imageName"
+
+    # 1. The image's own dynamic loader (its PT_INTERP target), invoked
+    #    explicitly rather than rewriting the image's interpreter. libexec/
+    #    holds the exec'd copy; the lib/ copy satisfies glibc's DT_NEEDED.
     interp=$(patchelf --print-interpreter "$img")
     loader=$(basename "$interp")
     cp -L "$interp" "$out/lib/$loader"
+    cp -L "$interp" "$out/libexec/$launcherName"
 
     # 2. Transitive DT_NEEDED, resolved against the build closure (ldd works here
     #    because /nix/store is present at build time). Keyed by SONAME.
@@ -169,6 +183,31 @@ builtins.seq _validated (runCommand "${name}-relocatable"
       done
     ''}
 
+    ${lib.optionalString (!isDarwin) ''
+      # Close DT_NEEDED over lib/ to a fixpoint: dlopen'd blessed libs may
+      # need sonames the image itself never links (e.g. sqlite -> libz),
+      # invisible to step 2's ldd of the image. Unresolved sonames fail.
+      changed=1
+      while [ "$changed" = 1 ]; do
+        changed=0
+        for so in "$out"/lib/*; do
+          needed=$(patchelf --print-needed "$so" 2>/dev/null) || continue
+          resolved=$(ldd "$so" 2>/dev/null | awk '/=>/ && $3 ~ /^\// { print $1, $3 }' || true)
+          for soname in $needed; do
+            case "$soname" in */*) continue ;; esac
+            [ -e "$out/lib/$soname" ] && continue
+            path=$(printf '%s\n' "$resolved" | awk -v s="$soname" '$1 == s { print $2 }')
+            if [ -z "$path" ]; then
+              echo "mkRelocatableBundle: cannot resolve DT_NEEDED '$soname' of $so" >&2
+              exit 1
+            fi
+            cp -L "$path" "$out/lib/$soname"
+            changed=1
+          done
+        done
+      done
+    ''}
+
     # 4. Resources.
     ${lib.optionalString (share != null) ''
       cp -r ${share}/share/. "$out/share/"
@@ -177,8 +216,5 @@ builtins.seq _validated (runCommand "${name}-relocatable"
     # 5. Launcher.
     cp ${launcher} "$out/bin/$launcherName"
     chmod u+w "$out/bin/$launcherName"
-  '' + lib.optionalString (!isDarwin) ''
-    sed -i "s|@LOADER@|$loader|" "$out/bin/$launcherName"
-  '' + ''
     chmod +x "$out/bin/$launcherName"
   ''))

@@ -28,7 +28,9 @@
 # / `profiles.effectful`). Both are typed values — there are no
 # `enable` flags; `null` is the off-switch.
 
-{ sandbox, lib, pkgs, fx, mb, implFilter, allDeps, allNative, testSuite, defaultImplementation, libraryBuilder, swankLib, swankCodegen, validateSpec }:
+# sandboxLib: the in-image SANDBOX package (stage-2 self-application);
+# distinct from the per-invocation `sandbox` profile argument.
+{ sandboxLib, lib, pkgs, fx, mb, implFilter, allDeps, allNative, testSuite, defaultImplementation, libraryBuilder, swankLib, swankCodegen, validateSpec }:
 
 let
   inherit (pkgs) runCommand makeWrapper writeText;
@@ -134,7 +136,8 @@ let
   swankWrapperLib = lib.optionalAttrs swankEnabled {
     lib = libraryBuilder {
       name = "${name}-repl-wrapper";
-      deps = deps ++ [ swankLib ] ++ lib.optional sandboxEnabled sandbox;
+      deps = deps ++ [ swankLib ]
+        ++ lib.optional (sandboxEnabled && sandboxLib != null) sandboxLib;
       srcs = [ swankSource.code ];
       inherit implementation cLibraries;
     };

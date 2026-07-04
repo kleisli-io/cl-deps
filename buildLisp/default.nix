@@ -70,9 +70,10 @@ let
       };
 
       programBuilder = import ./program.nix {
-        inherit lib pkgs fx mb sandbox implFilter allDeps allNative
+        inherit lib pkgs fx mb implFilter allDeps allNative
           testSuite defaultImplementation libraryBuilder
           swankLib swankCodegen validateSpec;
+        sandboxLib = sandbox;
       };
 
       scriptBuilder = import ./script.nix {
@@ -82,8 +83,9 @@ let
       };
 
       daemonBuilder = import ./daemon.nix {
-        inherit lib pkgs mb sandbox libraryBuilder swankLib swankCodegen
+        inherit lib pkgs mb libraryBuilder swankLib swankCodegen
           defaultImplementation validateSpec;
+        sandboxLib = sandbox;
         programBuilder = programBuilder;
       };
 

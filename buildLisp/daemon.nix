@@ -48,7 +48,9 @@
 #     mode = mb.ornaments.replServer.Mode.Foreground;
 #   };
 
-{ sandbox, lib, pkgs, mb, programBuilder, libraryBuilder, swankLib, swankCodegen, defaultImplementation, validateSpec }:
+# sandboxLib: the in-image SANDBOX package (stage-2 self-application);
+# distinct from the per-invocation `sandbox` profile argument.
+{ sandboxLib, lib, pkgs, mb, programBuilder, libraryBuilder, swankLib, swankCodegen, defaultImplementation, validateSpec }:
 
 let
   replOrn = mb.ornaments.replServer;
@@ -125,7 +127,7 @@ let
   wrapperDeps =
     deps
     ++ lib.optional swankEnabled swankLib
-    ++ lib.optional sandboxEnabled sandbox;
+    ++ lib.optional (sandboxEnabled && sandboxLib != null) sandboxLib;
 
   daemonWrapperLib = libraryBuilder {
     name = "${name}-repl-wrapper";
