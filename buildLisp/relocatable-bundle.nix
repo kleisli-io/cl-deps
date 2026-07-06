@@ -73,8 +73,23 @@ let
     export KLI_DATA_DIR="''${KLI_DATA_DIR:-$_root/${dataDir}}"
   '' + (if isDarwin then ''
     export DYLD_LIBRARY_PATH="$_root/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+    # OpenSSL in the bundle was compiled with a fixed Nix-store CA path that
+    # does not exist on the target host.  Probe common system CA bundle
+    # locations so HTTPS connections work out of the box.
+    if [ -z "''${SSL_CERT_FILE:-}" ]; then
+      for _f in /etc/ssl/cert.pem /etc/ssl/certs/ca-certificates.crt \
+                /opt/homebrew/etc/openssl@3/cert.pem; do
+        [ -f "$_f" ] && export SSL_CERT_FILE="$_f" && break
+      done
+    fi
     exec "$_root/libexec/${launcherName}" -- "$@"
   '' else ''
+    # Same CA-bundle probe for Linux.
+    if [ -z "''${SSL_CERT_FILE:-}" ]; then
+      for _f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt; do
+        [ -f "$_f" ] && export SSL_CERT_FILE="$_f" && break
+      done
+    fi
     exec "$_root/libexec/${launcherName}" --library-path "$_root/lib" "$_dir/${imageName}" -- "$@"
   ''));
 in
