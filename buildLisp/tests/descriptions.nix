@@ -33,6 +33,7 @@ let
     brokenOn = [ ];
     deps = [ ];
     cLibraries = [ ];
+    runtimeContracts = [ ];
     tests = null;
     commandTools = { };
     passthru = { };
@@ -75,6 +76,7 @@ let
     share = null;
     dataDir = null;
     dlopenProbe = null;
+    runtimeContracts = [ ];
     launcherName = "ds-x";
   };
 
@@ -113,6 +115,10 @@ let
       {
         name = "RelocatableBundleSpec datatype present";
         body = d.RelocatableBundleSpec ? T;
+      }
+      {
+        name = "specs accept runtimeContracts field";
+        body = libOk.runtimeContracts == [ ] && progOk.runtimeContracts == [ ];
       }
 
       {

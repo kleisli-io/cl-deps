@@ -28,6 +28,7 @@
 #   , main             : String
 #   , deps             : [LispLibrary]           ? []
 #   , cLibraries       : [Package]               ? []
+#   , runtimeContracts : [NativeRuntimeContract] ? []
 #   , tests            : TestSpec | Null         ? null
 #   , commandTools     : { name = Package; }     ? {}
 #   , passthru         : AttrSet                 ? {}
@@ -65,6 +66,7 @@ in
 , main
 , deps ? [ ]
 , cLibraries ? [ ]
+, runtimeContracts ? [ ]
 , tests ? null
 , commandTools ? { }
 , passthru ? { }
@@ -87,7 +89,7 @@ let
     inherit name;
     spec = {
       inherit name srcs implementation brokenOn main deps cLibraries tests
-        commandTools passthru verifyPackages preDump dynamicSpaceSize
+        runtimeContracts commandTools passthru verifyPackages preDump dynamicSpaceSize
         runtimeAssets swank sandbox serviceSpec;
     };
   };
@@ -133,7 +135,7 @@ let
     name = "${name}-repl-wrapper";
     deps = wrapperDeps;
     srcs = [ daemonWrapperCode ];
-    inherit implementation cLibraries;
+    inherit implementation cLibraries runtimeContracts;
   };
 
   # When swank embeds, the daemon's port appears as a default env var
@@ -167,7 +169,7 @@ in
 builtins.seq _validated (
   programBuilder {
     inherit name implementation tests sandbox cLibraries srcs brokenOn
-      dynamicSpaceSize preDump verifyPackages commandTools;
+      runtimeContracts dynamicSpaceSize preDump verifyPackages commandTools;
     runtimeAssets = assetPaths ++ runtimeAssets;
     deps = [ daemonWrapperLib ] ++ wrapperDeps;
     main = "buildlisp-repl-wrapper:run";

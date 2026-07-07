@@ -44,13 +44,14 @@
 # program's own Nix closure, so the shipped file is exactly the one the image
 # loaded.
 
-{ pkgs, lib, validateSpec }:
+{ pkgs, lib, validateSpec, runtimeContractOrn }:
 
 { name
 , program
 , share ? null
 , dataDir ? null
 , dlopenProbe ? null
+, runtimeContracts ? program.lispRuntimeContracts or [ ]
 , launcherName ? name
 }:
 
@@ -58,12 +59,14 @@ let
   _validated = validateSpec {
     kind = "relocatableBundle";
     inherit name;
-    spec = { inherit name program share dataDir dlopenProbe launcherName; };
+    spec = { inherit name program share dataDir dlopenProbe runtimeContracts launcherName; };
   };
 
   inherit (pkgs) runCommand;
   isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
   imageName = ".${name}-wrapped";
+  contractClosure = runtimeContractOrn.nativeLibrariesOf runtimeContracts
+    ++ map (sidecar: sidecar.package) (runtimeContractOrn.sidecarsOf runtimeContracts);
 
   launcher = pkgs.writeText "${name}-launcher" (''
     #!/bin/sh
@@ -71,25 +74,21 @@ let
     _root=$(CDPATH= cd -- "$_dir/.." && pwd)
   '' + lib.optionalString (dataDir != null) ''
     export KLI_DATA_DIR="''${KLI_DATA_DIR:-$_root/${dataDir}}"
-  '' + (if isDarwin then ''
+  '' + runtimeContractOrn.launcherEnvironmentSnippet {
+    rootVar = "_root";
+    contracts = runtimeContracts;
+  } + (if isDarwin then ''
     export DYLD_LIBRARY_PATH="$_root/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-    # OpenSSL in the bundle was compiled with a fixed Nix-store CA path that
-    # does not exist on the target host.  Probe common system CA bundle
-    # locations so HTTPS connections work out of the box.
-    if [ -z "''${SSL_CERT_FILE:-}" ]; then
-      for _f in /etc/ssl/cert.pem /etc/ssl/certs/ca-certificates.crt \
-                /opt/homebrew/etc/openssl@3/cert.pem; do
-        [ -f "$_f" ] && export SSL_CERT_FILE="$_f" && break
-      done
-    fi
+    ${runtimeContractOrn.launcherHostPolicySnippet {
+      inherit isDarwin;
+      contracts = runtimeContracts;
+    }}
     exec "$_root/libexec/${launcherName}" -- "$@"
   '' else ''
-    # Same CA-bundle probe for Linux.
-    if [ -z "''${SSL_CERT_FILE:-}" ]; then
-      for _f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt; do
-        [ -f "$_f" ] && export SSL_CERT_FILE="$_f" && break
-      done
-    fi
+    ${runtimeContractOrn.launcherHostPolicySnippet {
+      inherit isDarwin;
+      contracts = runtimeContracts;
+    }}
     exec "$_root/libexec/${launcherName}" --library-path "$_root/lib" "$_dir/${imageName}" -- "$@"
   ''));
 in
@@ -97,7 +96,8 @@ builtins.seq _validated (runCommand "${name}-relocatable"
   ({
     __structuredAttrs = true;
     exportReferencesGraph.closure =
-      [ program ] ++ lib.optional (dlopenProbe != null) dlopenProbe.drv;
+      [ program ] ++ lib.optional (dlopenProbe != null) dlopenProbe.drv
+        ++ contractClosure;
     nativeBuildInputs = [ pkgs.jq ]
       ++ (if isDarwin then [ pkgs.darwin.cctools ]
           else [ pkgs.patchelf pkgs.glibc.bin ]);
@@ -223,7 +223,9 @@ builtins.seq _validated (runCommand "${name}-relocatable"
       done
     ''}
 
-    # 4. Resources.
+    # 4. Runtime contract sidecars and resources.
+    ${runtimeContractOrn.bundleSidecarCopySnippet { contracts = runtimeContracts; }}
+
     ${lib.optionalString (share != null) ''
       cp -r ${share}/share/. "$out/share/"
     ''}

@@ -13,6 +13,7 @@
 #   , brokenOn       : [String]       ? []
 #   , deps           : [LispLibrary]  ? []
 #   , cLibraries     : [Package]      ? []
+#   , runtimeContracts : [NativeRuntimeContract] ? []
 #   , tests          : TestSpec | Null ? null
 #   , commandTools   : { name = Package; } ? {}
 #   , passthru       : AttrSet        ? {}
@@ -26,6 +27,7 @@
 
 let
   toolEnvOrn = mb.ornaments.toolEnv;
+  runtimeContractOrn = mb.ornaments.runtime-contract;
   unwrapDeps = mb.ornaments.dependencies.unwrapDeps;
   inherit (import ./internal/test.nix { inherit testSuite; }) mkTestDrv;
 in
@@ -36,6 +38,7 @@ in
 , brokenOn ? [ ]
 , deps ? [ ]
 , cLibraries ? [ ]
+, runtimeContracts ? [ ]
 , tests ? null
 , commandTools ? { }
 , passthru ? { }
@@ -59,7 +62,7 @@ let
     inherit name;
     spec = {
       inherit name srcs implementation brokenOn deps cLibraries tests
-        commandTools passthru replInit muffle resources;
+        runtimeContracts commandTools passthru replInit muffle resources;
     };
   };
 
@@ -81,7 +84,13 @@ let
   filteredDeps = implFilter implementation (unwrapDeps deps);
   filteredSrcs = implFilter implementation (resourceSrcs ++ srcs);
   lispDeps = allDeps implementation filteredDeps;
-  lispNativeDeps = allNative cLibraries filteredDeps;
+  lispRuntimeContracts = runtimeContractOrn.contractsFor {
+    nativeLibraries = cLibraries;
+    explicit = runtimeContracts;
+    deps = filteredDeps;
+  };
+  nativeRuntimeLibraries = runtimeContractOrn.nativeLibrariesOf lispRuntimeContracts;
+  lispNativeDeps = nativeRuntimeLibraries;
   toolEnv = toolEnvOrn.create commandTools;
 
   testDrv = mkTestDrv {
@@ -100,6 +109,7 @@ builtins.seq _validated (lib.fix (self: runCommand "${name}-cllib"
     lispBinary = false;
     lispSrcs = filteredSrcs;
     lispResources = resources;
+    inherit lispRuntimeContracts;
     reloadScript = "${self}/reload.lisp";
     tests = testDrv;
     toolPackages = toolEnvOrn.toolPackages toolEnv;

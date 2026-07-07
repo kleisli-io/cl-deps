@@ -9,7 +9,7 @@
 # then edit the matching `expected.<key>` after auditing the cause.
 # Never edit `expected` to mask an unexplained change.
 
-{ lib, pkgs, mb, buildLisp, ... }:
+{ lib, pkgs, mb, buildLisp, sandboxStage2Available ? true, ... }:
 
 let
   bl = buildLisp;
@@ -57,21 +57,39 @@ let
     srcs = [ programSrc ];
     main = "fx-prog:main";
   };
+  fxProgramOpenSSL = bl.program {
+    name = "fx-prog-openssl";
+    srcs = [ programSrc ];
+    main = "fx-prog:main";
+    cLibraries = [ pkgs.openssl ];
+  };
   fxRelocatable = bl.mkRelocatableBundle {
     name = "fx-prog";
     program = fxProgram;
     launcherName = "fx-reloc";
   };
+  fxRelocatableOpenSSL = bl.mkRelocatableBundle {
+    name = "fx-prog-openssl";
+    program = fxProgramOpenSSL;
+    launcherName = "fx-reloc-openssl";
+  };
   fxRelocatableCaProbe = pkgs.runCommand "fx-relocatable-ca-probe" { } ''
-    set -eu
-    launcher=${fxRelocatable}/bin/fx-reloc
+    set -euo pipefail
+    launcher=${fxRelocatableOpenSSL}/bin/fx-reloc-openssl
     grep -q 'SSL_CERT_FILE' "$launcher"
     grep -q '/etc/ssl/certs/ca-certificates.crt' "$launcher"
     grep -q '/etc/pki/tls/certs/ca-bundle.crt' "$launcher"
+    grep -q 'OPENSSL_MODULES' "$launcher"
+    test -d ${fxRelocatableOpenSSL}/lib/ossl-modules
+    find ${fxRelocatableOpenSSL}/lib/ossl-modules -name 'legacy.*' -print -quit | grep -q .
+    if grep -q '/nix/store' "$launcher"; then
+      echo "launcher contains a store path" >&2
+      exit 1
+    fi
     touch "$out"
   '';
 
-  derivations = {
+  baseDerivations = {
     fixLib = bl.library {
       name = "fx-lib";
       srcs = [ libSrc ];
@@ -93,6 +111,8 @@ let
 
     fixRelocatable = fxRelocatable;
 
+    fixRelocatableOpenSSL = fxRelocatableOpenSSL;
+
     fixRelocatableCaProbe = fxRelocatableCaProbe;
 
     fixProgSwank = bl.program {
@@ -106,14 +126,6 @@ let
       name = "fx-prog-sandbox";
       srcs = [ programSrc ];
       main = "fx-prog:main";
-      sandbox = sealed;
-    };
-
-    fixProgSwankSandbox = bl.program {
-      name = "fx-prog-sw-sb";
-      srcs = [ programSrc ];
-      main = "fx-prog:main";
-      swank = fgSwank;
       sandbox = sealed;
     };
 
@@ -136,6 +148,17 @@ let
       main = "fx-daemon:main";
     };
 
+  };
+
+  stage2Derivations = lib.optionalAttrs sandboxStage2Available {
+    fixProgSwankSandbox = bl.program {
+      name = "fx-prog-sw-sb";
+      srcs = [ programSrc ];
+      main = "fx-prog:main";
+      swank = fgSwank;
+      sandbox = sealed;
+    };
+
     fixDaemonSwankSandbox = bl.daemon {
       name = "fx-daemon-sw-sb";
       srcs = [ daemonSrc ];
@@ -145,6 +168,8 @@ let
     };
   };
 
+  derivations = baseDerivations // stage2Derivations;
+
   # Expected outPaths. Captured once when this file landed; updated only
   # after an intentional, audited drift. Placeholders here are flagged by
   # the suite as drift so the initial capture cannot pass silently.
@@ -153,14 +178,16 @@ let
     fixLibDeps = "/nix/store/yg8jc71ff9xn5hqrv4gd8ghzyjkvcymd-fx-lib-deps-cllib";
     fixLibTests = "/nix/store/4xp0z9gqjvpagk6i8rwsqgf3q7dnaz3w-fx-lib-tests-cllib";
     fixProg = "/nix/store/mgv8z7h0bvln0sgpagwaccz4qqc5x5cq-fx-prog";
-    fixRelocatable = "/nix/store/hc1565gv42w5qwp7a1lqk2d384y41zvv-fx-prog-relocatable";
-    fixRelocatableCaProbe = "/nix/store/vlxg398hjvhyryqxch7lnyygf3ab3a4g-fx-relocatable-ca-probe";
+    fixRelocatable = "/nix/store/dadsj435liz0y2flxv3valyh9njjfazc-fx-prog-relocatable";
+    fixRelocatableOpenSSL = "/nix/store/p8iyjyci9gpfwq0k247qibpf3rmhgqsj-fx-prog-openssl-relocatable";
+    fixRelocatableCaProbe = "/nix/store/9whb3a1hv065hvjfl3ighvd30mhag1ba-fx-relocatable-ca-probe";
     fixProgSwank = "/nix/store/ddfpm8kg2r5ab1hwf86737f7b4yw0zxy-fx-prog-swank";
     fixProgSandbox = "/nix/store/i8cfva0mmwi3l6gkzhk74kjsw9qz3sd2-fx-prog-sandbox";
-    fixProgSwankSandbox = "/nix/store/5bz8lyahf76rqp3xr5clv23qywrsnqsf-fx-prog-sw-sb";
     fixScript = "/nix/store/y46armpwh5ynaf1rcg1ab6msimxz9wxg-fx-script";
     fixScriptSandbox = "/nix/store/7a4vgj9mfizl5dz67a57qj2d74k7m1kn-fx-script-sandbox";
     fixDaemon = "/nix/store/j3h6s097ikghnfgfibavnv1rxggy9akx-fx-daemon";
+  } // lib.optionalAttrs sandboxStage2Available {
+    fixProgSwankSandbox = "/nix/store/5bz8lyahf76rqp3xr5clv23qywrsnqsf-fx-prog-sw-sb";
     fixDaemonSwankSandbox = "/nix/store/9ybdb4bi47aiygi0fxk43hl5k7l4bjdp-fx-daemon-sw-sb";
   };
 

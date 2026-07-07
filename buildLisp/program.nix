@@ -12,6 +12,7 @@
 #   , main             : String               ? "${name}:main"
 #   , deps             : [LispLibrary]        ? []
 #   , cLibraries       : [Package]            ? []
+#   , runtimeContracts : [NativeRuntimeContract] ? []
 #   , tests            : TestSpec | Null      ? null
 #   , commandTools     : { name = Package; }  ? {}
 #   , passthru         : AttrSet              ? {}
@@ -37,6 +38,7 @@ let
   inherit (fx.state) forceThunk;
 
   toolEnvOrn = mb.ornaments.toolEnv;
+  runtimeContractOrn = mb.ornaments.runtime-contract;
   sandboxOrn = mb.ornaments.sandbox;
   unwrapDeps = mb.ornaments.dependencies.unwrapDeps;
 
@@ -80,6 +82,7 @@ in
 , main ? "${name}:main"
 , deps ? [ ]
 , cLibraries ? [ ]
+, runtimeContracts ? [ ]
 , tests ? null
 , commandTools ? { }
 , passthru ? { }
@@ -100,7 +103,7 @@ let
     inherit name;
     spec = {
       inherit name srcs implementation brokenOn main deps cLibraries tests
-        commandTools passthru verifyPackages preDump dynamicSpaceSize
+        runtimeContracts commandTools passthru verifyPackages preDump dynamicSpaceSize
         runtimeAssets swank sandbox;
     };
   };
@@ -108,7 +111,13 @@ let
   filteredSrcs = implFilter implementation srcs;
   filteredDeps = implFilter implementation (unwrapDeps deps);
   lispDeps = allDeps implementation filteredDeps;
-  libPath = lib.makeLibraryPath (allNative cLibraries (unwrapDeps lispDeps));
+  lispRuntimeContracts = runtimeContractOrn.contractsFor {
+    nativeLibraries = cLibraries;
+    explicit = runtimeContracts;
+    deps = filteredDeps;
+  };
+  nativeRuntimeLibraries = runtimeContractOrn.nativeLibrariesOf lispRuntimeContracts;
+  libPath = lib.makeLibraryPath nativeRuntimeLibraries;
   toolEnv = toolEnvOrn.create commandTools;
 
   hasSrcs = filteredSrcs != [ ];
@@ -163,7 +172,7 @@ let
             lib.optional hasSrcs "${selfLib}"
             ++ lib.optional swankEnabled "${swankWrapperLib.lib}"
             ++ map (d: "${d}") (unwrapDeps lispDeps)
-            ++ map (d: "${d}") (allNative cLibraries (unwrapDeps lispDeps))
+            ++ map (d: "${d}") nativeRuntimeLibraries
             ++ [ "${sandboxBpfBwrap}" "${sandboxBpfSelf}" ]
             ++ map (d: "${d}") runtimeAssets
             ++ map (d: "${d}") (builtins.attrValues (toolEnvOrn.toolPackages toolEnv))
@@ -195,6 +204,7 @@ let
           # idempotently, so this is a no-op operationally.
           deps = unwrapDeps lispDeps;
           srcs = filteredSrcs;
+          inherit runtimeContracts;
         }
     else null;
 
@@ -311,7 +321,8 @@ builtins.seq _validated (lib.fix (self: runCommand name
     passthru = passthru // {
       lispName = name;
       lispDeps = if hasSrcs then [ selfLib ] else unwrapDeps lispDeps;
-      lispNativeDeps = cLibraries;
+      lispNativeDeps = nativeRuntimeLibraries;
+      inherit lispRuntimeContracts;
       lispBinary = true;
       tests = testDrv;
       inherit brokenOn commandTools;

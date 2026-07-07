@@ -11,8 +11,8 @@
 #
 # Type hierarchy:
 #   LispScriptableSpec      — common root (name/srcs/deps/cLibraries/
-#                             tests/commandTools/passthru/brokenOn/
-#                             implementation).
+#                             runtimeContracts/tests/commandTools/passthru/
+#                             brokenOn/implementation).
 #   LispLibrarySpec         — ornaments root with replInit, muffle.
 #   LispProgramSpec         — ornaments root with main, verifyPackages,
 #                             preDump, dynamicSpaceSize, runtimeAssets,
@@ -37,6 +37,7 @@ let
 
   REPLServerSpec = mb.descriptions.REPLServerSpec;
   SandboxProfile = mb.descriptions.SandboxProfile;
+  NativeRuntimeContract = mb.descriptions.NativeRuntimeContract;
 
   # `TestSpec` documents the inner shape `mkTestDrv` consumes. It is
   # NOT enforced at the LispScriptableSpec layer because `H.product`
@@ -68,6 +69,7 @@ let
     (H.field "brokenOn" (H.listOf H.string))
     (H.field "deps" (H.listOf H.derivation))
     (H.field "cLibraries" (H.listOf H.derivation))
+    (H.field "runtimeContracts" (H.listOf NativeRuntimeContract.T))
     (H.field "tests" (H.maybe H.attrs))
     (H.field "commandTools" H.attrs)
     (H.field "passthru" H.attrs)
@@ -80,6 +82,7 @@ let
     { keep = "brokenOn"; }
     { keep = "deps"; }
     { keep = "cLibraries"; }
+    { keep = "runtimeContracts"; }
     { keep = "tests"; }
     { keep = "commandTools"; }
     { keep = "passthru"; }
@@ -136,6 +139,7 @@ let
       { keep = "brokenOn"; }
       { keep = "deps"; }
       { keep = "cLibraries"; }
+      { keep = "runtimeContracts"; }
       { keep = "tests"; }
       { keep = "commandTools"; }
       { keep = "passthru"; }
@@ -162,6 +166,7 @@ let
     (H.field "share" (H.maybe H.derivation))
     (H.field "dataDir" (H.maybe H.string))
     (H.field "dlopenProbe" (H.maybe H.attrs))
+    (H.field "runtimeContracts" (H.listOf NativeRuntimeContract.T))
     (H.field "launcherName" H.string)
   ];
 

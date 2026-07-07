@@ -11,6 +11,8 @@ let
   inherit (pkgs) runCommand writeText writeShellScriptBin sbcl ecl ccl rlwrap writers;
   inherit (pkgs.stdenv) targetPlatform;
   isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+  sandboxStage2Probe = builtins.tryEval sandbox;
+  sandboxStage2Available = sandboxStage2Probe.success && sandboxStage2Probe.value != null;
 
   toolEnvOrn = mb.ornaments.toolEnv;
   implsOrn = mb.ornaments.implementations;
@@ -136,7 +138,11 @@ mkBuildLisp { baseToolEnv = toolEnvOrn.empty; } // {
   grovel = import ./grovel.nix { inherit pkgs lib mb lisp buildLisp; };
   repl = import ./repl { inherit lib; };
   serviceSpec = import ./service-spec.nix { inherit lib; };
-  mkRelocatableBundle = import ./relocatable-bundle.nix { inherit pkgs lib; validateSpec = descriptions.validate; };
+  mkRelocatableBundle = import ./relocatable-bundle.nix {
+    inherit pkgs lib;
+    validateSpec = descriptions.validate;
+    runtimeContractOrn = mb.ornaments.runtime-contract;
+  };
   inherit descriptions;
-  tests = import ./tests { inherit lib pkgs mb buildLisp; };
+  tests = import ./tests { inherit lib pkgs mb buildLisp sandboxStage2Available; };
 }

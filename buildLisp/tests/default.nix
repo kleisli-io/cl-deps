@@ -13,13 +13,14 @@
 #     `replConfig`), `sandboxProfile`, `systemdHardening`, `serviceSpec`,
 #     `lib` (= selfLib), `isDaemon`, `isScript`, `originalMain`.
 
-{ lib, pkgs, mb, buildLisp, ... }:
+{ lib, pkgs, mb, buildLisp, sandboxStage2Available ? true, ... }:
 
 let
   bl = buildLisp;
 
   testing = mb.ornaments.testing;
   sandboxOrn = mb.ornaments.sandbox;
+  runtimeContractOrn = mb.ornaments.runtime-contract;
   replOrn = mb.ornaments.replServer;
   swankProto = replOrn.protocols.swank;
   Foreground = replOrn.Mode.Foreground;
@@ -561,6 +562,7 @@ let
         name = "program sandbox → passthru.sandboxProfile present";
         body = testProgramSandboxed.passthru ? sandboxProfile;
       }
+    ] ++ lib.optionals sandboxStage2Available [
       {
         name = "daemon sandbox → passthru.sandboxProfile present";
         body = testDaemonSandboxed.passthru ? sandboxProfile;
@@ -571,6 +573,7 @@ let
           testDaemonSandboxed.passthru.systemdHardening._con
           == "MetaBuilderSystemdHardening";
       }
+    ] ++ [
       {
         name = "sandbox profile typed _con preserved through builder";
         body = testScriptSandboxed.passthru.sandboxProfile._con
@@ -744,11 +747,58 @@ let
     ];
   };
 
+  runtimeContracts =
+    let
+      sslLib = bl.library {
+        name = "runtime-contract-ssl-lib";
+        srcs = [ ];
+        cLibraries = [ pkgs.openssl ];
+      };
+      sslContract = builtins.head sslLib.passthru.lispRuntimeContracts;
+      sslProgram = bl.program {
+        name = "runtime-contract-ssl-program";
+        deps = [ sslLib ];
+        main = "cl-user:main";
+      };
+    in
+    testSuite {
+      name = "runtimeContracts";
+      cases = [
+        {
+          name = "cLibraries desugar OpenSSL to runtime contract";
+          body = sslContract.name == "openssl";
+        }
+        {
+          name = "OpenSSL contract carries CA host policy";
+          body = sslContract.hostPolicy.caTrust == true;
+        }
+        {
+          name = "OpenSSL contract carries provider sidecar";
+          body = lib.any
+            (sidecar: sidecar.envVar == "OPENSSL_MODULES"
+              && sidecar.destination == "lib/ossl-modules")
+            sslContract.sidecars;
+        }
+        {
+          name = "program inherits dependency runtime contracts";
+          body = lib.any
+            (contract: contract.name == "openssl")
+            sslProgram.passthru.lispRuntimeContracts;
+        }
+        {
+          name = "native runtime libraries project from contracts";
+          body = runtimeContractOrn.nativeLibrariesOf sslProgram.passthru.lispRuntimeContracts != [ ];
+        }
+      ];
+    };
+
   # ============================================================================
   # Derivation-hash fixtures — locks shell-text byte content of runCommand
   # bodies. Eval-time invariants above verify type shape; this catches drift.
   # ============================================================================
-  derivationFixtures = import ./derivation-fixtures.nix { inherit lib pkgs mb buildLisp; };
+  derivationFixtures = import ./derivation-fixtures.nix {
+    inherit lib pkgs mb buildLisp sandboxStage2Available;
+  };
 
   # ============================================================================
   # Typed input contracts — datatypes + validator behaviour.
@@ -770,6 +820,7 @@ let
     sandbox
     serviceSpec
     repl
+    runtimeContracts
     derivationFixtures.suite
     descriptionsTests.suite
   ];
