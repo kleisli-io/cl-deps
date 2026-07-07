@@ -795,6 +795,7 @@ in
 {
   inherit (totals) passed failed skipped allPass;
   suites = results;
+  fixtureDerivations = derivationFixtures.derivations;
   fixtureActuals = derivationFixtures.actuals;
   summary =
     "${toString totals.passed} passed, ${toString totals.failed} failed"
