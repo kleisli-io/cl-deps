@@ -1,0 +1,88 @@
+--- a/src/compiler.lisp
++++ b/src/compiler.lisp
+@@ -83,8 +83,10 @@
+
+ ;;; special forms
+
+-(defvar *special-expression-operators* (make-hash-table :test 'eq))
+-(defvar *special-statement-operators* (make-hash-table :test 'eq))
++(defvar *special-expression-operators*
++  (make-hash-table :test 'eq #+sbcl :synchronized #+sbcl t))
++(defvar *special-statement-operators*
++  (make-hash-table :test 'eq #+sbcl :synchronized #+sbcl t))
+
+ ;; need to split special op definition into two parts - statement and expression
+ (defmacro %define-special-operator (type name lambda-list &body body)
+@@ -173,15 +175,17 @@
+
+ ;;; meta info
+
+-(defvar *macro-toplevel-lambda-list* (make-hash-table)
++(defvar *macro-toplevel-lambda-list*
++  (make-hash-table #+sbcl :synchronized #+sbcl t)
+   "Table of lambda lists for toplevel macros.")
+
+-(defvar *function-lambda-list* (make-hash-table)
++(defvar *function-lambda-list*
++  (make-hash-table #+sbcl :synchronized #+sbcl t)
+   "Table of lambda lists for defined functions.")
+
+ ;;; macros
+ (defun make-macro-dictionary ()
+-  (make-hash-table :test 'eq))
++  (make-hash-table :test 'eq #+sbcl :synchronized #+sbcl t))
+
+ (defvar *macro-toplevel* (make-macro-dictionary)
+   "Toplevel macro environment dictionary.")
+--- a/src/namespace.lisp
++++ b/src/namespace.lisp
+@@ -38,14 +38,26 @@
+ (in-package #:parenscript)
+ (named-readtables:in-readtable :parenscript)
+
+-(defvar *obfuscated-packages* (make-hash-table))
++(defvar *obfuscated-packages*
++  (make-hash-table #+sbcl :synchronized #+sbcl t))
+
+ (defun obfuscate-package (package-designator &optional symbol-map)
+   (setf (gethash (find-package package-designator)
+                  *obfuscated-packages*)
+         (or symbol-map
+-            (let ((symbol-table (make-hash-table)))
++            (let ((symbol-table
++                    (make-hash-table #+sbcl :synchronized #+sbcl t))
++                  #+sbcl
++                  (symbol-table-lock
++                    (sb-thread:make-mutex
++                     :name "Parenscript obfuscation symbol table")))
+               (lambda (symbol)
++                #+sbcl
++                (sb-thread:with-mutex (symbol-table-lock)
++                  (or (gethash symbol symbol-table)
++                      (setf (gethash symbol symbol-table)
++                            (ps-gensym 'g))))
++                #-sbcl
+                 (or (gethash symbol symbol-table)
+                     (setf (gethash symbol symbol-table)
+                           (ps-gensym 'g))))))))
+@@ -60,7 +72,8 @@
+            (funcall it symbol)
+            symbol)))
+
+-(defvar *package-prefix-table* (make-hash-table))
++(defvar *package-prefix-table*
++  (make-hash-table #+sbcl :synchronized #+sbcl t))
+
+ (defmacro ps-package-prefix (package)
+   `(gethash (find-package ,package) *package-prefix-table*))
+--- a/src/utils.lisp
++++ b/src/utils.lisp
+@@ -44,7 +44,7 @@
+ (define-condition simple-style-warning (simple-warning style-warning)
+   ())
+
+-(let ((cache (make-hash-table :test 'equal)))
++(let ((cache (make-hash-table :test 'equal #+sbcl :synchronized #+sbcl t)))
+   (defun encode-js-identifier (identifier)
+     "Given a string, produces to a valid JavaScript identifier by
+ following transformation heuristics case conversion. For example,

@@ -734,7 +734,17 @@ let
         ];
       };
 
-    parenscript = let src = pkgs.srcOnly pkgs.sbcl.pkgs.parenscript; in
+    parenscript =
+      let
+        baseSrc = pkgs.srcOnly pkgs.sbcl.pkgs.parenscript;
+        src = pkgs.applyPatches {
+          name = "parenscript-source-patched";
+          src = baseSrc;
+          patches = [
+            ./patches/parenscript-thread-safe-caches.patch
+          ];
+        };
+      in
       buildLisp.library {
         name = "parenscript";
         deps = [ cl-ppcre anaphora named-readtables ];
